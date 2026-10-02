@@ -15,7 +15,7 @@ from .config import ROOT, UPLOAD_DIR
 
 STATIC = ROOT / "app" / "static"
 
-app = FastAPI(title="MyWardrobe")
+app = FastAPI(title="Ocasionly")
 db.init()
 app.include_router(wishlist_router)
 app.include_router(memory.router)

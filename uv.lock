@@ -162,7 +162,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mywardrobe"
+name = "ocasionly"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

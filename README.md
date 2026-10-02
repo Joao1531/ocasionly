@@ -1,4 +1,4 @@
-# MyWardrobe
+# Ocasionly
 
 A personal wardrobe manager with an AI stylist. Photograph your clothes once, describe an occasion ("company dinner on Friday, it will be cold"), and the app proposes outfits built **only from garments you own**, explains the reasoning, shows the exact pieces, and renders an image of you wearing each outfit.
 
@@ -49,8 +49,8 @@ wardrobe photos + attributes ─► text / vision model ─► outfits (JSON) �
 **Requirements:** macOS or Linux, [uv](https://docs.astral.sh/uv/) (`brew install uv`). Python 3.11+ is handled by `uv`.
 
 ```bash
-git clone https://github.com/Joao1531/MyWardrobe.git
-cd MyWardrobe
+git clone https://github.com/Joao1531/ocasionly.git
+cd ocasionly
 uv sync
 cp .env.example .env          # optional: everything can be configured in the app
 uv run uvicorn app.main:app --reload

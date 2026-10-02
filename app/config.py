@@ -62,7 +62,7 @@ def save(values: dict) -> None:
     SETTINGS_PATH.chmod(0o600)
 
 
-USER_AGENT = "MyWardrobe/0.1"
+USER_AGENT = "ocasionly/0.1"
 SESSION_ID = str(uuid.uuid4())  # estável enquanto o servidor estiver a correr
 
 

@@ -1,5 +1,5 @@
 [project]
-name = "mywardrobe"
+name = "ocasionly"
 version = "0.1.0"
 description = "Guarda-roupa pessoal com recomendações de outfits e provador virtual"
 requires-python = ">=3.11"
