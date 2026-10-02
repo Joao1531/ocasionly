@@ -1,0 +1,25 @@
+# Ambiente
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Segredos: nunca no repositório
+.env
+.env.*
+!.env.example
+data/settings.json
+
+# Dados pessoais: fotos, base de dados, miniaturas (tudo vive em data/)
+data/
+*.db
+*.sqlite*
+
+# Fotos soltas em qualquer sítio (o único ficheiro de imagem do projeto é app/static/icon.svg)
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.heic
+*.heif
+*.gif
