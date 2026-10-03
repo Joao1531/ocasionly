@@ -1,4 +1,4 @@
-"""Lê os metadados (título, imagem, loja, preço) de um link de produto."""
+"""Read the metadata (title, image, store, price) of a product link."""
 import ipaddress
 import socket
 from html.parser import HTMLParser
@@ -17,18 +17,18 @@ class LinkError(Exception):
 
 
 def check_url(url: str) -> str:
-    """Só http(s) e só hosts públicos: o servidor não pode ser usado para aceder à rede local."""
+    """Only http(s) and only public hosts: the server must not be usable to reach the local network."""
     p = urlparse(url)
     if p.scheme not in ("http", "https") or not p.hostname:
-        raise LinkError("Link inválido. Tem de começar por http:// ou https://.")
+        raise LinkError("Invalid link. It must start with http:// or https://.")
     try:
         infos = socket.getaddrinfo(p.hostname, p.port or (443 if p.scheme == "https" else 80))
     except socket.gaierror as e:
-        raise LinkError("Não consegui encontrar esse site.") from e
+        raise LinkError("Could not find that website.") from e
     for info in infos:
         ip = ipaddress.ip_address(info[4][0])
         if not ip.is_global:
-            raise LinkError("Esse endereço não é público.")
+            raise LinkError("That address is not public.")
     return url
 
 
@@ -87,7 +87,7 @@ def parse_html(html: str, base_url: str) -> dict:
 
 
 def _get(client: httpx.Client, url: str, limit: int) -> tuple[bytes, str]:
-    """GET com redireções manuais, validando cada destino, e com limite de tamanho."""
+    """GET with manual redirects, validating every destination, and with a size limit."""
     for _ in range(MAX_REDIRECTS + 1):
         check_url(url)
         with client.stream("GET", url) as r:
@@ -101,16 +101,16 @@ def _get(client: httpx.Client, url: str, limit: int) -> tuple[bytes, str]:
                 if len(data) > limit:
                     break
             return data[:limit], url
-    raise LinkError("Demasiados redirecionamentos.")
+    raise LinkError("Too many redirects.")
 
 
 def fetch_meta(url: str) -> tuple[dict, bytes | None]:
-    """Devolve (metadados, bytes da imagem). Falhas de rede/bloqueios devolvem metadados vazios."""
+    """Return (metadata, image bytes). Network failures or blocks return empty metadata."""
     check_url(url)
     meta = {"title": "", "store": "", "price": "", "image_url": ""}
     img = None
     try:
-        with httpx.Client(headers={"User-Agent": UA, "Accept-Language": "pt-PT,pt;q=0.9,en;q=0.8"}, timeout=10.0) as c:
+        with httpx.Client(headers={"User-Agent": UA, "Accept-Language": "en-GB,en;q=0.9,pt;q=0.8"}, timeout=10.0) as c:
             raw, final = _get(c, url, MAX_HTML)
             meta = parse_html(raw.decode("utf-8", errors="ignore"), final)
             if meta["image_url"]:

@@ -35,7 +35,7 @@ def _read_image(file: UploadFile, prefix: str) -> str:
     try:
         return images.save_upload(file.file.read(), prefix)
     except Exception:
-        raise HTTPException(400, "Imagem inválida.")
+        raise HTTPException(400, "Invalid image.")
 
 
 def _ai_call(fn, *args):
@@ -52,10 +52,10 @@ def status():
 
 def _check_category(category: str) -> None:
     if category not in db.CATEGORY_IDS:
-        raise HTTPException(400, f"Categoria inválida. Usa uma de: {', '.join(db.CATEGORY_IDS)}.")
+        raise HTTPException(400, f"Invalid category. Use one of: {', '.join(db.CATEGORY_IDS)}.")
 
 
-# ---------- Peças ----------
+# ---------- Garments ----------
 @app.get("/api/items")
 def list_items():
     with db.conn() as c:
@@ -126,7 +126,7 @@ def delete_item(item_id: int):
 
 @app.post("/api/items/analyze")
 def analyze(image: UploadFile = File(...)):
-    """Sugere campos a partir da foto. A imagem temporária é apagada."""
+    """Suggest fields from the photo. The temporary image is deleted."""
     fname = _read_image(image, "tmp")
     try:
         return _ai_call(ai.analyze_item, fname)
@@ -134,7 +134,7 @@ def analyze(image: UploadFile = File(...)):
         images.delete(fname)
 
 
-# ---------- Perfil ----------
+# ---------- Profile ----------
 class Profile(BaseModel):
     text: str
 
@@ -153,7 +153,7 @@ def put_profile(body: Profile):
     return {"ok": True}
 
 
-# ---------- Conselhos ----------
+# ---------- Stylist ----------
 class Ask(BaseModel):
     prompt: str
 
@@ -165,7 +165,7 @@ def advise(body: Ask):
         profile = memory.profile_for_prompt(c)
         mem, hist = memory.memory_text(c), memory.history_text(c)
     if not items:
-        raise HTTPException(400, "Adiciona primeiro algumas peças ao guarda-roupa.")
+        raise HTTPException(400, "Add some garments to your wardrobe first.")
     result = _ai_call(ai.advise, body.prompt, items, profile, mem, hist)
     by_id = {i["id"]: _row(i) for i in items}
     for o in result.get("outfits", []):
@@ -176,7 +176,7 @@ def advise(body: Ask):
     return result
 
 
-# ---------- Provador ----------
+# ---------- Fitting room ----------
 @app.get("/api/people")
 def list_people():
     with db.conn() as c:
@@ -210,13 +210,13 @@ class TryOn(BaseModel):
 @app.post("/api/tryon")
 def do_tryon(body: TryOn):
     if not 1 <= len(body.item_ids) <= config.MAX_OUTFIT_ITEMS:
-        raise HTTPException(400, f"Escolhe entre 1 e {config.MAX_OUTFIT_ITEMS} peças.")
+        raise HTTPException(400, f"Choose between 1 and {config.MAX_OUTFIT_ITEMS} garments.")
     with db.conn() as c:
         person = c.execute("SELECT * FROM people WHERE id=?", (body.person_id,)).fetchone()
         marks = ",".join("?" * len(body.item_ids))
         items = c.execute(f"SELECT * FROM items WHERE id IN ({marks})", body.item_ids).fetchall()
     if not person or len(items) != len(set(body.item_ids)):
-        raise HTTPException(404, "Pessoa ou peça não encontrada.")
+        raise HTTPException(404, "Person or garment not found.")
     raw = _ai_call(tryon.generate, person["image"], [i["image"] for i in items], [i["name"] for i in items])
     fname = images.save_bytes(raw, "tryon")
     with db.conn() as c:
@@ -235,7 +235,7 @@ def thumb(name: str):
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 
-NO_CACHE = {"Cache-Control": "no-cache"}  # o browser revalida sempre (ETag), por isso nunca fica com JS/CSS antigos
+NO_CACHE = {"Cache-Control": "no-cache"}  # the browser always revalidates (ETag), so it never keeps stale JS/CSS
 
 
 @app.get("/")

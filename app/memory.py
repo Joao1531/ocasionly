@@ -1,4 +1,4 @@
-"""Memória do estilista: factos aprendidos, histórico de pedidos e feedback."""
+"""Stylist memory: learned facts, request history and feedback."""
 import json
 
 from fastapi import APIRouter, HTTPException
@@ -9,21 +9,21 @@ from .ai import AIError
 
 router = APIRouter(prefix="/api")
 
-MAX_MEMORIES = 100  # as mais recentes entram no prompt
+MAX_MEMORIES = 100  # the most recent ones go into the prompt
 HISTORY_IN_PROMPT = 5
 
 
-# ---------- Medidas e tamanhos ----------
+# ---------- Measurements and sizes ----------
 BODY_FIELDS = {
-    "height_cm": ("Altura", "cm", (100, 250)),
-    "weight_kg": ("Peso", "kg", (30, 300)),
+    "height_cm": ("Height", "cm", (100, 250)),
+    "weight_kg": ("Weight", "kg", (30, 300)),
 }
 SIZE_FIELDS = {
-    "size_top": "t-shirts/camisas",
-    "size_jacket": "casacos",
-    "size_pants": "calças",
-    "size_shorts": "calções",
-    "size_shoes": "sapatos",
+    "size_top": "t-shirts/shirts",
+    "size_jacket": "coats",
+    "size_pants": "trousers",
+    "size_shorts": "shorts",
+    "size_shoes": "shoes",
 }
 
 
@@ -40,12 +40,12 @@ def body_text(body: dict) -> str:
     parts = [f"{label}: {body[k]} {unit}" for k, (label, unit, _) in BODY_FIELDS.items() if body.get(k)]
     sizes = [f"{label} {body[k]}" for k, label in SIZE_FIELDS.items() if body.get(k)]
     if sizes:
-        parts.append("Tamanhos habituais: " + "; ".join(sizes))
+        parts.append("Usual sizes: " + "; ".join(sizes))
     return ". ".join(parts)
 
 
 def profile_for_prompt(c) -> str:
-    """Medidas estruturadas + perfil em texto livre, juntos, para entrar no prompt."""
+    """Structured measurements + free-text profile, together, to go into the prompt."""
     row = c.execute("SELECT value FROM profile WHERE key='text'").fetchone()
     return "\n".join(x for x in (body_text(get_body(c)), row["value"] if row else "") if x)
 
@@ -65,14 +65,14 @@ def history_text(c) -> str:
         for n, o in enumerate(outfits):
             part = f"«{o['title']}» ({', '.join(o['item_names'])})"
             if n in fb:
-                part += f" → {'gostou' if fb[n]['rating'] > 0 else 'não gostou'}" + (f" ({fb[n]['comment']})" if fb[n]["comment"] else "")
+                part += f" → {'liked it' if fb[n]['rating'] > 0 else 'did not like it'}" + (f" ({fb[n]['comment']})" if fb[n]["comment"] else "")
             parts.append(part)
-        lines.append(f"- {h['created_at'][:10]}: pedido «{h['prompt']}» → sugeriste: " + "; ".join(parts))
+        lines.append(f"- {h['created_at'][:10]}: request «{h['prompt']}» → you suggested: " + "; ".join(parts))
     return "\n".join(lines)
 
 
 def add_learned(c, learned: list[dict], source: str) -> list[dict]:
-    """Guarda factos novos (sem duplicados) e devolve os que ficaram guardados."""
+    """Store new facts (no duplicates) and return the ones that were saved."""
     saved = []
     have = {r["text"].lower() for r in c.execute("SELECT text FROM memories")}
     for x in learned:
@@ -113,11 +113,11 @@ def write_body(body: BodyIn):
             try:
                 value = float(data[k].replace(",", "."))
             except ValueError:
-                raise HTTPException(400, f"{label}: indica um número.")
-            if k == "height_cm" and value < 3:  # "1,78" = metros
+                raise HTTPException(400, f"{label}: enter a number.")
+            if k == "height_cm" and value < 3:  # "1,78" / "1.78" = metres
                 value *= 100
             if not lo <= value <= hi:
-                raise HTTPException(400, f"{label}: tem de estar entre {lo} e {hi}.")
+                raise HTTPException(400, f"{label}: must be between {lo} and {hi}.")
             data[k] = f"{value:.0f}" if k == "height_cm" else f"{value:g}"
     with db.conn() as c:
         c.execute("INSERT INTO profile (key, value) VALUES ('body', ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value",
@@ -125,14 +125,14 @@ def write_body(body: BodyIn):
     return data
 
 
-# ---------- Memória ----------
+# ---------- Memory ----------
 class MemoryIn(BaseModel):
     text: str
-    kind: str = "facto"
+    kind: str = "fact"
 
 
 def _kind(kind: str) -> str:
-    return kind if kind in ai.KINDS else "facto"
+    return kind if kind in ai.KINDS else "fact"
 
 
 @router.get("/memories")
@@ -145,11 +145,11 @@ def list_memories():
 def add_memory(body: MemoryIn):
     text = body.text.strip()[:200]
     if not text:
-        raise HTTPException(400, "Escreve o que o estilista deve saber.")
+        raise HTTPException(400, "Write what the stylist should know.")
     with db.conn() as c:
         saved = add_learned(c, [{"text": text, "kind": _kind(body.kind)}], "user")
     if not saved:
-        raise HTTPException(409, "O estilista já sabe isto.")
+        raise HTTPException(409, "The stylist already knows this.")
     return saved[0]
 
 
@@ -157,7 +157,7 @@ def add_memory(body: MemoryIn):
 def edit_memory(memory_id: int, body: MemoryIn):
     text = body.text.strip()[:200]
     if not text:
-        raise HTTPException(400, "O texto não pode ficar vazio.")
+        raise HTTPException(400, "The text cannot be empty.")
     with db.conn() as c:
         c.execute("UPDATE memories SET text=?, kind=? WHERE id=?", (text, _kind(body.kind), memory_id))
     return {"ok": True}
@@ -170,7 +170,7 @@ def delete_memory(memory_id: int):
     return {"ok": True}
 
 
-# ---------- Histórico ----------
+# ---------- History ----------
 @router.get("/history")
 def list_history():
     with db.conn() as c:
@@ -188,32 +188,32 @@ def list_history():
 class FeedbackIn(BaseModel):
     history_id: int
     outfit_index: int
-    rating: int  # 1 = gostou, -1 = não gostou
+    rating: int  # 1 = liked, -1 = disliked
     comment: str = ""
 
 
 @router.post("/feedback")
 def feedback(body: FeedbackIn):
     if body.rating not in (1, -1):
-        raise HTTPException(400, "Avaliação inválida.")
+        raise HTTPException(400, "Invalid rating.")
     comment = body.comment.strip()[:300]
     with db.conn() as c:
         h = c.execute("SELECT * FROM history WHERE id=?", (body.history_id,)).fetchone()
         outfits = json.loads(h["result"]) if h else []
         if not h or not 0 <= body.outfit_index < len(outfits):
-            raise HTTPException(404, "Outfit não encontrado.")
+            raise HTTPException(404, "Outfit not found.")
         c.execute("DELETE FROM feedback WHERE history_id=? AND outfit_index=?", (body.history_id, body.outfit_index))
         c.execute("INSERT INTO feedback (history_id, outfit_index, rating, comment) VALUES (?,?,?,?)",
                   (body.history_id, body.outfit_index, body.rating, comment))
         o = outfits[body.outfit_index]
-        desc = f"«{o['title']}» ({', '.join(o['item_names'])}) para o pedido «{h['prompt']}»"
+        desc = f"«{o['title']}» ({', '.join(o['item_names'])}) for the request «{h['prompt']}»"
         mem = memory_text(c)
     learned: list[dict] = []
     if comment:
         try:
             learned = ai.learn_from_feedback(desc, body.rating, comment, mem)
         except AIError:
-            learned = []  # o feedback fica guardado mesmo que a extração falhe
+            learned = []  # the feedback stays saved even if the extraction fails
     with db.conn() as c:
         saved = add_learned(c, learned, "feedback")
     return {"ok": True, "learned": saved}

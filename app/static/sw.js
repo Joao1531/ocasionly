@@ -1,2 +1,2 @@
-// Service worker mínimo: torna a app instalável. Não faz cache (os dados são sempre do servidor).
+// Minimal service worker: makes the app installable. It does not cache anything (data always comes from the server).
 self.addEventListener("fetch", () => {});

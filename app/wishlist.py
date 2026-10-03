@@ -23,10 +23,10 @@ def _ensure_store(c, name: str) -> None:
 
 def _check_category(category: str) -> None:
     if category and category not in db.CATEGORY_IDS:
-        raise HTTPException(400, "Categoria inválida.")
+        raise HTTPException(400, "Invalid category.")
 
 
-# ---------- Lojas ----------
+# ---------- Stores ----------
 class StoreIn(BaseModel):
     name: str = ""
     interested: bool = True
@@ -45,7 +45,7 @@ def list_stores():
 def add_store(body: StoreIn):
     name = body.name.strip()
     if not name:
-        raise HTTPException(400, "Indica o nome da loja.")
+        raise HTTPException(400, "Enter the store name.")
     with db.conn() as c:
         c.execute(
             "INSERT INTO stores (name, interested) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET interested=excluded.interested",
@@ -68,7 +68,7 @@ def delete_store(store_id: int):
     return {"ok": True}
 
 
-# ---------- Lista de desejos ----------
+# ---------- Wishlist ----------
 class WishIn(BaseModel):
     url: str = ""
     title: str = ""
@@ -107,11 +107,11 @@ def add_wish(body: WishIn):
                 image = ""
     if not title:
         if not url:
-            raise HTTPException(400, "Indica um título ou um link.")
+            raise HTTPException(400, "Enter a title or a link.")
         title = url
     with db.conn() as c:
         if url and c.execute("SELECT 1 FROM wishlist WHERE url=?", (url,)).fetchone():
-            raise HTTPException(409, "Este link já está guardado.")
+            raise HTTPException(409, "This link is already saved.")
         _ensure_store(c, store)
         cur = c.execute(
             "INSERT INTO wishlist (url, title, store, category, price, notes, image, source) VALUES (?,?,?,?,?,?,?,?)",
@@ -152,7 +152,7 @@ def delete_wish(wish_id: int):
     return {"ok": True}
 
 
-# ---------- Sugestões da IA ----------
+# ---------- AI suggestions ----------
 class SuggestIn(BaseModel):
     prompt: str = ""
 
@@ -166,7 +166,7 @@ def suggest(body: SuggestIn):
         profile = memory.profile_for_prompt(c)
         mem = memory.memory_text(c)
     if not items:
-        raise HTTPException(400, "Adiciona primeiro algumas peças ao armário para eu perceber o teu estilo.")
+        raise HTTPException(400, "Add some garments to your wardrobe first so I can understand your style.")
     liked = [s["name"] for s in stores if s["interested"]]
     avoided = [s["name"] for s in stores if not s["interested"]]
     try:

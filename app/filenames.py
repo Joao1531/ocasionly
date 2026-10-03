@@ -1,41 +1,48 @@
-"""Interpreta nomes de ficheiro como `Calças_Ganga_Levis_511_W33_L34.jpg`.
+"""Parse file names such as `Trousers_Denim_Levis_511_W33_L34.jpg` (Portuguese names such as `Calças_Ganga_...` work too).
 
-As partes vêm separadas por `_` e sem ordem fixa, por isso cada parte é classificada pelo que é:
-tamanho (M, 44, W33, L34), cor, corte, material, tipo de peça ou marca/modelo (o que sobra).
-O resultado é só uma proposta: tudo fica editável na app.
+Parts are separated by `_` and have no fixed order, so each part is classified by what it is:
+size (M, 44, W33, L34), colour, fit, material, garment type, or brand/model (whatever is left).
+The result is only a proposal: every field stays editable in the app.
 """
 import re
-import unicodedata
+
+from .vocab import COLOR_MODIFIERS, COLOR_WORDS, MATERIALS, norm
 
 SIZES = {"xxs", "xs", "s", "m", "l", "xl", "xxl", "xxxl", "3xl", "4xl"}
-COLORS = {
-    "branco", "branca", "preto", "preta", "azul", "vermelho", "vermelha", "verde", "amarelo", "amarela", "cinza", "cinzento",
-    "cinzenta", "castanho", "castanha", "bege", "beige", "rosa", "laranja", "roxo", "roxa", "violeta", "bordeaux", "caqui",
-    "navy", "creme", "dourado", "dourada", "prateado", "prateada", "turquesa", "salmao", "mostarda", "oliva", "multicolor",
-    "white", "black", "blue", "red", "green", "yellow", "grey", "gray", "brown", "pink", "orange", "purple", "khaki", "cream",
-}
-COLOR_MODIFIERS = {"claro", "clara", "escuro", "escura", "marinho", "marinha", "forte", "pastel"}
 FITS = {"wide", "slim", "regular", "oversize", "oversized", "baggy", "skinny", "straight", "relaxed", "loose", "tapered", "boxy", "cropped", "fit", "comfort"}
-MATERIALS = {"ganga", "denim", "algodao", "linho", "couro", "pele", "la", "fleece", "sarja", "veludo", "camurca", "seda", "poliester", "malha", "nylon"}
-# palavra do tipo de peça -> (categoria, rótulo para o nome); a categoria vem da pasta, isto só dá o rótulo
+# garment-type word (normalised, English or Portuguese) -> label used in the generated name
 TYPES = {
-    "tshirt": "T-shirt", "tee": "T-shirt", "camisa": "Camisa", "polo": "Polo", "camisola": "Camisola", "sweat": "Sweat",
-    "hoodie": "Hoodie", "casaco": "Casaco", "blazer": "Blazer", "parka": "Parka", "blusao": "Blusão", "calcas": "Calças",
-    "calcoes": "Calções", "bermudas": "Bermudas", "meias": "Meias", "sapatos": "Sapatos", "tenis": "Ténis", "botas": "Botas",
-    "sandalias": "Sandálias", "chapeu": "Chapéu", "bone": "Boné", "gorro": "Gorro", "cinto": "Cinto", "relogio": "Relógio",
-    "oculos": "Óculos", "cachecol": "Cachecol", "luvas": "Luvas", "gravata": "Gravata", "mala": "Mala", "carteira": "Carteira",
+    "tshirt": "T-shirt", "tee": "T-shirt", "camisa": "Shirt", "shirt": "Shirt", "polo": "Polo",
+    "camisola": "Sweater", "sweater": "Sweater", "jumper": "Sweater", "sweat": "Sweatshirt", "sweatshirt": "Sweatshirt", "hoodie": "Hoodie",
+    "casaco": "Coat", "coat": "Coat", "jacket": "Jacket", "blazer": "Blazer", "parka": "Parka", "blusao": "Jacket",
+    "calcas": "Trousers", "trousers": "Trousers", "pants": "Pants", "jeans": "Jeans",
+    "calcoes": "Shorts", "shorts": "Shorts", "bermudas": "Bermuda shorts",
+    "meias": "Socks", "socks": "Socks", "sapatos": "Shoes", "shoes": "Shoes",
+    "tenis": "Sneakers", "sneakers": "Sneakers", "trainers": "Sneakers", "botas": "Boots", "boots": "Boots",
+    "sandalias": "Sandals", "sandals": "Sandals",
+    "chapeu": "Hat", "hat": "Hat", "bone": "Cap", "cap": "Cap", "gorro": "Beanie", "beanie": "Beanie",
+    "cinto": "Belt", "belt": "Belt", "relogio": "Watch", "watch": "Watch", "oculos": "Glasses", "glasses": "Glasses", "sunglasses": "Sunglasses",
+    "cachecol": "Scarf", "scarf": "Scarf", "luvas": "Gloves", "gloves": "Gloves", "gravata": "Tie", "tie": "Tie",
+    "mala": "Bag", "bag": "Bag", "carteira": "Wallet", "wallet": "Wallet",
 }
-# pasta (normalizada) -> id da categoria na app
-FOLDERS = {
-    "tshirt": "t-shirt", "tshirts": "t-shirt",
-    "camisa": "camisa", "camisas": "camisa",
-    "camisola": "camisola", "camisolas": "camisola", "hoodie": "camisola", "hoodies": "camisola", "sweat": "camisola", "sweats": "camisola",
-    "hoodiecamisola": "camisola", "hoodiecamisolas": "camisola", "hoodiescamisolas": "camisola", "hoodieecamisolas": "camisola",
-    "hoodiesecamisolas": "camisola", "camisolashoodies": "camisola", "camisolasehoodies": "camisola", "camisolahoodie": "camisola",
-    "calcoes": "calções", "calcao": "calções",
-    "calcas": "calças", "calca": "calças", "meias": "meias", "meia": "meias",
-    "casaco": "casaco", "casacos": "casaco", "sapatos": "sapatos", "sapato": "sapatos",
-    "acessorios": "acessórios", "acessorio": "acessórios",
+# folder name (normalised, punctuation removed) -> category id used by the app
+_FOLDER_NAMES = {
+    "tshirt": "tshirt", "tshirts": "tshirt",
+    "shirt": "shirt", "shirts": "shirt", "camisa": "shirt", "camisas": "shirt",
+    "sweater": "sweater", "sweaters": "sweater", "hoodie": "sweater", "hoodies": "sweater", "sweat": "sweater", "sweats": "sweater",
+    "sweatshirt": "sweater", "sweatshirts": "sweater", "jumper": "sweater", "jumpers": "sweater",
+    "camisola": "sweater", "camisolas": "sweater",
+    # "Hoodie/Sweater" cannot be a folder name on macOS: Hoodie-Sweaters, Hoodie_Sweaters, "Hoodies and Sweaters"... all work
+    "hoodiesweater": "sweater", "hoodiesweaters": "sweater", "hoodiesandsweaters": "sweater", "hoodiesweatshirts": "sweater",
+    "sweatershoodies": "sweater", "sweatersandhoodies": "sweater",
+    "hoodiecamisola": "sweater", "hoodiecamisolas": "sweater", "hoodiescamisolas": "sweater", "hoodieecamisolas": "sweater",
+    "hoodiesecamisolas": "sweater", "camisolashoodies": "sweater", "camisolasehoodies": "sweater", "camisolahoodie": "sweater",
+    "shorts": "shorts", "calcoes": "shorts", "calcao": "shorts",
+    "trousers": "trousers", "pants": "trousers", "jeans": "trousers", "calcas": "trousers", "calca": "trousers",
+    "socks": "socks", "meias": "socks", "meia": "socks",
+    "coat": "coat", "coats": "coat", "jacket": "coat", "jackets": "coat", "casaco": "coat", "casacos": "coat",
+    "shoes": "shoes", "footwear": "shoes", "sapatos": "shoes", "sapato": "shoes",
+    "accessories": "accessories", "accessory": "accessories", "acessorios": "accessories", "acessorio": "accessories",
 }
 KNOWN_BRANDS = {
     "nike", "adidas", "puma", "reebok", "newbalance", "asics", "converse", "vans", "levis", "wrangler", "lee", "diesel", "zara",
@@ -44,11 +51,7 @@ KNOWN_BRANDS = {
     "carhartt", "northface", "thenorthface", "patagonia", "columbia", "champion", "fila", "kappa", "umbro", "newera", "ray-ban",
     "rayban", "casio", "seiko", "gstock", "timberland", "drmartens", "clarks", "geox", "sacoor", "salsa", "decathlon", "kiabi",
 }
-
-
-def norm(s: str) -> str:
-    s = unicodedata.normalize("NFKD", s)
-    return "".join(c for c in s if not unicodedata.combining(c)).lower().strip()
+CAMERA_NAME = re.compile(r"^(img|dsc|dscn|dscf|pxl|image|photo|foto|screenshot|captura|whatsapp)[\s_\-.]*\d", re.I)
 
 
 def _pretty(token: str) -> str:
@@ -56,31 +59,26 @@ def _pretty(token: str) -> str:
 
 
 def folder_category(folder: str) -> str | None:
-    # "Hoodie/Camisolas" não pode ser nome de pasta no Mac: aceita Hoodie-Camisolas, Hoodie_Camisolas, "Hoodies e Camisolas"…
-    return FOLDERS.get(re.sub(r"[^a-z0-9]", "", norm(folder)))
-
-
-CAMERA_NAME = re.compile(r"^(img|dsc|dscn|dscf|pxl|image|photo|foto|screenshot|captura|whatsapp)[\s_\-.]*\d", re.I)
+    return _FOLDER_NAMES.get(re.sub(r"[^a-z0-9]", "", norm(folder)))
 
 
 def parse(filename: str, category: str, fallback_label: str = "") -> dict:
-    """Devolve name/size/brand/model/color/fit/material para um ficheiro de uma dada categoria."""
+    """Return name/size/brand/model/color/fit/material proposed for a file of the given category."""
     stem = re.sub(r"\.[A-Za-z0-9]+$", "", filename)
     tokens = [t for t in re.split(r"[_\s]+", stem) if t]
     out = {"color": "", "size": "", "brand": "", "model": "", "fit": "", "material": "", "name": ""}
-    if CAMERA_NAME.match(stem):  # nome automático da câmara: não tem informação
+    if CAMERA_NAME.match(stem):  # automatic camera name: carries no information
         return out
     type_label = ""
     waist = length = ""
+    colors: list[str] = []
     leftovers: list[str] = []
-    last_was_color = False
 
     for tok in tokens:
         n = norm(tok)
-        was_color = False
         if (m := re.fullmatch(r"w(\d{2})", n)):
             waist = m.group(1)
-        elif (m := re.fullmatch(r"l(\d{2})", n)) and category in ("calças", "calções"):
+        elif (m := re.fullmatch(r"l(\d{2})", n)) and category in ("trousers", "shorts"):
             length = m.group(1)
         elif n in SIZES and not out["size"]:
             out["size"] = tok.upper()
@@ -88,44 +86,43 @@ def parse(filename: str, category: str, fallback_label: str = "") -> dict:
             out["size"] = tok
         elif n in TYPES and not type_label:
             type_label = TYPES[n]
-        elif n in COLORS:
-            out["color"] = (out["color"] + " " + n).strip()
-            was_color = True
-        elif n in COLOR_MODIFIERS and last_was_color:
-            out["color"] += " " + n
-            was_color = True
+        elif n in COLOR_WORDS:
+            colors.append(COLOR_WORDS[n])
+        elif n in COLOR_MODIFIERS and colors:  # "Blue_Light" -> "light blue": the modifier goes before the colour
+            colors[-1] = f"{COLOR_MODIFIERS[n]} {colors[-1]}"
         elif n in FITS and not out["fit"]:
             out["fit"] = tok.capitalize()
         elif n in MATERIALS and not out["material"]:
-            out["material"] = tok.capitalize()
+            out["material"] = MATERIALS[n]
         elif n.replace("-", "") in KNOWN_BRANDS and not out["brand"]:
             out["brand"] = _pretty(tok)
         else:
             leftovers.append(tok)
-        last_was_color = was_color
 
+    out["color"] = " ".join(colors)
     if waist:
         out["size"] = f"W{waist}" + (f" L{length}" if length else "")
-    # o que sobra: a primeira palavra é a marca (se ainda não há) e o resto é o modelo
+    # what is left: the first word is the brand (if there is none yet) and the rest is the model
     if leftovers and not out["brand"] and not leftovers[0].isdigit():
         out["brand"] = _pretty(leftovers.pop(0))
     out["model"] = " ".join(_pretty(t) for t in leftovers)
 
-    name_parts = [type_label or fallback_label, out["material"], out["color"], out["brand"], out["model"]]
-    out["name"] = " ".join(p for p in name_parts if p) or _pretty(stem.replace("_", " "))
+    name_parts = [out["material"], out["color"], out["brand"], out["model"], type_label or fallback_label]
+    name = " ".join(p for p in name_parts if p) or _pretty(stem.replace("_", " "))
+    out["name"] = name[0].upper() + name[1:]
     return out
 
 
 def _numeric_is_size(n: int, category: str, current_size: str, waist: str) -> bool:
-    """Um número de 2 dígitos só é tamanho em categorias onde isso faz sentido e se ainda não há tamanho."""
+    """A two-digit number is only a size in categories where that makes sense and if there is no size yet."""
     if current_size or waist:
         return False
-    if category == "sapatos":
+    if category == "shoes":
         return 34 <= n <= 49
-    if category in ("calças", "calções"):
+    if category in ("trousers", "shorts"):
         return 28 <= n <= 54
-    if category in ("t-shirt", "camisa", "camisola", "casaco"):
+    if category in ("tshirt", "shirt", "sweater", "coat"):
         return 34 <= n <= 54
-    if category == "meias":
+    if category == "socks":
         return 34 <= n <= 49
     return False

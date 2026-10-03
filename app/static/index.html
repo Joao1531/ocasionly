@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-PT">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -10,12 +10,12 @@
   <title>Ocasionly</title>
 </head>
 <body>
-  <header><h1>Ocasionly</h1><button id="settings-btn" aria-label="Definições" title="Definições e modelos">⚙ Modelos <span id="model-dot" class="dot"></span></button></header>
+  <header><h1>Ocasionly</h1><button id="settings-btn" aria-label="Settings" title="Settings and models">⚙ Models <span id="model-dot" class="dot"></span></button></header>
   <main>
     <section id="tab-closet">
       <div class="bar">
-        <button id="import-btn">Importar da pasta</button>
-        <div class="seg" id="view-toggle"><button data-view="mini" class="on">Miniaturas</button><button data-view="big">Detalhe</button></div>
+        <button id="import-btn">Import from folder</button>
+        <div class="seg" id="view-toggle"><button data-view="mini" class="on">Thumbnails</button><button data-view="big">Detail</button></div>
         <span id="progress" class="muted"></span>
       </div>
       <div id="cat-tabs" class="cat-tabs"></div>
@@ -23,182 +23,182 @@
     </section>
 
     <section id="tab-advise" class="hidden">
-      <textarea id="prompt" rows="4" placeholder="Ex.: Jantar de empresa na sexta, restaurante elegante, vai estar frio. Quero parecer arranjado mas não demasiado formal."></textarea>
-      <label class="check"><input type="checkbox" id="auto-tryon" checked> No fim, gerar uma imagem minha com cada outfit (usa a foto mais recente do separador Provador)</label>
-      <button class="primary" id="ask-btn">Aconselha-me</button>
+      <textarea id="prompt" rows="4" placeholder="e.g. Company dinner on Friday, elegant restaurant, it will be cold. I want to look sharp but not too formal."></textarea>
+      <label class="check"><input type="checkbox" id="auto-tryon" checked> When done, generate an image of me in each outfit (uses your most recent photo from the Fitting room tab)</label>
+      <button class="primary" id="ask-btn">Style me</button>
       <div id="advice"></div>
     </section>
 
     <section id="tab-tryon" class="hidden">
-      <h2>1. A tua foto</h2>
-      <p class="muted">Foto de corpo inteiro, de frente, boa luz.</p>
+      <h2>1. Your photo</h2>
+      <p class="muted">Full-body photo, facing the camera, good light.</p>
       <div id="people" class="row"></div>
-      <label class="button">+ Carregar foto<input type="file" id="person-file" accept="image/*" hidden></label>
-      <h2>2. Peças a vestir <span class="muted">(máx. <span id="max-items">8</span>)</span></h2>
+      <label class="button">+ Upload photo<input type="file" id="person-file" accept="image/*" hidden></label>
+      <h2>2. Garments to wear <span class="muted">(max. <span id="max-items">8</span>)</span></h2>
       <div id="tryon-items"></div>
-      <button class="primary" id="tryon-btn">Vestir-me</button>
+      <button class="primary" id="tryon-btn">Dress me</button>
       <div id="tryon-result"></div>
     </section>
 
     <section id="tab-wish" class="hidden">
-      <h2>Guardar um link</h2>
+      <h2>Save a link</h2>
       <form id="wish-form" class="stack">
-        <input name="url" type="url" placeholder="Cola aqui o link da peça (Zara, Zalando, ASOS…)">
-        <input name="title" placeholder="Título (opcional se houver link)">
+        <input name="url" type="url" placeholder="Paste the product link here (Zara, Zalando, ASOS…)">
+        <input name="title" placeholder="Title (optional if there is a link)">
         <div class="two">
           <select name="category" id="wish-category"></select>
-          <input name="price" placeholder="Preço (opcional)">
+          <input name="price" placeholder="Price (optional)">
         </div>
-        <input name="notes" placeholder="Notas: porque gostaste, com que roupa combina…">
-        <button class="primary" id="wish-save" type="submit">Guardar</button>
+        <input name="notes" placeholder="Notes: why you liked it, what it goes with…">
+        <button class="primary" id="wish-save" type="submit">Save</button>
         <p id="wish-msg" class="muted"></p>
       </form>
 
-      <h2>Lojas</h2>
-      <p class="muted">Toca numa loja para alternar entre interesse e sem interesse. As sugestões da IA só usam lojas com interesse.</p>
+      <h2>Stores</h2>
+      <p class="muted">Tap a store to switch between interested and not interested. AI suggestions only use stores you are interested in.</p>
       <div id="stores" class="chips"></div>
       <form id="store-form" class="inline">
-        <input name="name" placeholder="Nova loja">
-        <button type="submit" data-interest="1">+ Interesse</button>
-        <button type="submit" data-interest="0">+ Sem interesse</button>
+        <input name="name" placeholder="New store">
+        <button type="submit" data-interest="1">+ Interested</button>
+        <button type="submit" data-interest="0">+ Not interested</button>
       </form>
 
-      <h2>Ideias da IA</h2>
-      <textarea id="suggest-prompt" rows="2" placeholder="Opcional: Procuro algo para o verão, ou sapatos para usar com fato…"></textarea>
-      <button id="suggest-btn">Sugerir com base no meu armário</button>
-      <p class="muted">São ideias com uma pesquisa pronta, não links verificados de produtos.</p>
+      <h2>AI ideas</h2>
+      <textarea id="suggest-prompt" rows="2" placeholder="Optional: I am looking for something for summer, or shoes to wear with a suit…"></textarea>
+      <button id="suggest-btn">Suggest based on my wardrobe</button>
+      <p class="muted">These are ideas with a ready-made search, not verified product links.</p>
       <div id="suggestions"></div>
 
-      <h2>Guardados</h2>
-      <select id="wish-filter"><option value="">Todas as lojas</option></select>
+      <h2>Saved</h2>
+      <select id="wish-filter"><option value="">All stores</option></select>
       <div id="wishlist"></div>
     </section>
 
     <section id="tab-memory" class="hidden">
-      <p class="muted">Tudo o que está aqui entra em cada pedido ao estilista, por isso ele não começa do zero. Ele também aprende sozinho com o que dizes e com o teu feedback aos outfits.</p>
-      <h2>Medidas e tamanhos</h2>
+      <p class="muted">Everything here goes into every request to the stylist, so it never starts from scratch. It also learns on its own from what you say and from your feedback on outfits.</p>
+      <h2>Measurements and sizes</h2>
       <form id="body-form" class="stack">
-        <div class="two"><label>Altura (cm) <input name="height_cm" inputmode="decimal" placeholder="178"></label><label>Peso (kg) <input name="weight_kg" inputmode="decimal" placeholder="75"></label></div>
-        <div class="two"><label>T-shirts / camisas <input name="size_top" placeholder="M"></label><label>Casacos <input name="size_jacket" placeholder="L"></label></div>
-        <div class="two"><label>Calças <input name="size_pants" placeholder="42 ou 32/32"></label><label>Calções <input name="size_shorts" placeholder="M"></label></div>
-        <label>Sapatos <input name="size_shoes" placeholder="43"></label>
-        <div class="bar"><button class="primary" type="submit">Guardar medidas</button><span id="body-msg" class="muted"></span></div>
+        <div class="two"><label>Height (cm) <input name="height_cm" inputmode="decimal" placeholder="178"></label><label>Weight (kg) <input name="weight_kg" inputmode="decimal" placeholder="75"></label></div>
+        <div class="two"><label>T-shirts / shirts <input name="size_top" placeholder="M"></label><label>Coats <input name="size_jacket" placeholder="L"></label></div>
+        <div class="two"><label>Trousers <input name="size_pants" placeholder="42 or 32/32"></label><label>Shorts <input name="size_shorts" placeholder="M"></label></div>
+        <label>Shoes <input name="size_shoes" placeholder="43"></label>
+        <div class="bar"><button class="primary" type="submit">Save measurements</button><span id="body-msg" class="muted"></span></div>
       </form>
 
-      <h2>Perfil base</h2>
-      <textarea id="profile-text" rows="5" placeholder="1,78 m, 75 kg, ombros largos. Gosto de tons escuros e linhas simples. Evito padrões."></textarea>
-      <div class="bar"><button id="profile-save">Guardar perfil</button><span id="profile-msg" class="muted"></span></div>
+      <h2>Base profile</h2>
+      <textarea id="profile-text" rows="5" placeholder="1.78 m, 75 kg, broad shoulders. I like dark tones and simple lines. I avoid patterns."></textarea>
+      <div class="bar"><button id="profile-save">Save profile</button><span id="profile-msg" class="muted"></span></div>
 
-      <h2>Memória <span class="muted" id="memory-count"></span></h2>
+      <h2>Memory <span class="muted" id="memory-count"></span></h2>
       <form id="memory-form" class="inline">
-        <input name="text" placeholder="Ex.: Nunca uso castanho · Prefiro camisas por fora" maxlength="200">
-        <select name="kind"><option>preferência</option><option>regra</option><option>facto</option></select>
-        <button class="primary" type="submit">Adicionar</button>
+        <input name="text" placeholder="e.g. I never wear brown · I prefer shirts untucked" maxlength="200">
+        <select name="kind"><option>preference</option><option>rule</option><option>fact</option></select>
+        <button class="primary" type="submit">Add</button>
       </form>
       <p id="memory-msg" class="error"></p>
       <div id="memories"></div>
 
-      <h2>Histórico</h2>
+      <h2>History</h2>
       <div id="history"></div>
     </section>
 
     <section id="tab-settings" class="hidden">
-      <h2>Modelo de texto e visão</h2>
-      <p class="muted">Qualquer API compatível com OpenAI (opencode Go, OpenRouter…). Escolhe o modelo, carrega em «Guardar e testar» e vê logo se funciona. Muda quando quiseres, sem reiniciar.</p>
+      <h2>Text and vision model</h2>
+      <p class="muted">Any OpenAI-compatible API (opencode Go, OpenRouter…). Pick the model, press "Save and test" and see right away whether it works. Change it whenever you like, no restart needed.</p>
       <form id="settings-form" class="stack">
-        <label>URL base <input name="LLM_BASE_URL" placeholder="https://opencode.ai/zen/go/v1"></label>
-        <label>Chave de API <input name="LLM_API_KEY" type="password" autocomplete="off" placeholder="cola a chave (fica guardada no servidor)"></label>
-        <div class="bar"><button type="button" id="load-models">Carregar lista de modelos</button><span id="models-msg" class="muted"></span></div>
-        <label>Modelo de texto (conselhos, sugestões, memória) <input name="LLM_MODEL" list="model-list" placeholder="glm-5.3-flash"></label>
-        <label>Modelo com visão (ver as fotos das peças) <input name="LLM_VISION_MODEL" list="model-list" placeholder="glm-5.3-flash — vazio = sem fotos"></label>
+        <label>Base URL <input name="LLM_BASE_URL" placeholder="https://opencode.ai/zen/go/v1"></label>
+        <label>API key <input name="LLM_API_KEY" type="password" autocomplete="off" placeholder="paste the key (it is stored on the server)"></label>
+        <div class="bar"><button type="button" id="load-models">Load model list</button><span id="models-msg" class="muted"></span></div>
+        <label>Text model (advice, suggestions, memory) <input name="LLM_MODEL" list="model-list" placeholder="glm-5.3-flash"></label>
+        <label>Vision model (sees the garment photos) <input name="LLM_VISION_MODEL" list="model-list" placeholder="glm-5.3-flash — empty = no photos"></label>
         <datalist id="model-list"></datalist>
         <div class="bar">
-          <button type="button" class="primary" data-test="text">Guardar e testar texto</button>
-          <button type="button" class="primary" data-test="vision">Guardar e testar visão</button>
+          <button type="button" class="primary" data-test="text">Save and test text</button>
+          <button type="button" class="primary" data-test="vision">Save and test vision</button>
         </div>
         <div id="result-text" class="result"></div>
         <div id="result-vision" class="result"></div>
 
-        <h2>Consumo</h2>
+        <h2>Usage</h2>
       <p class="muted" id="usage-line">—</p>
-      <h2>Provador virtual (modelo que gera imagens)</h2>
-        <p class="muted">Precisa de um modelo com <b>saída de imagem</b>. Por defeito, o Gemini da Google. Segundo a documentação, os modelos Gemini do opencode só devolvem texto: se quiseres confirmar com a tua conta, aponta o URL para <code>https://opencode.ai/zen/v1</code> e testa a geração (se a chave ficar vazia, usa a do opencode).</p>
-        <label>URL da API (estilo Gemini) <input name="TRYON_BASE_URL" placeholder="https://generativelanguage.googleapis.com/v1beta"></label>
-        <label>Chave <input name="GEMINI_API_KEY" type="password" autocomplete="off" placeholder="chave do AI Studio (aistudio.google.com/apikey)"></label>
-        <label>Modelo de imagem <input name="TRYON_MODEL" placeholder="gemini-2.5-flash-image"></label>
+      <h2>Fitting room (image-generating model)</h2>
+        <p class="muted">Needs a model with <b>image output</b>. Google Gemini by default. According to its documentation, opencode's Gemini models only return text: to check with your account, point the URL to <code>https://opencode.ai/zen/v1</code> and run the generation test (if the key is left empty, the opencode key is used). Generated images always have a plain, neutral background.</p>
+        <label>API URL (Gemini style) <input name="TRYON_BASE_URL" placeholder="https://generativelanguage.googleapis.com/v1beta"></label>
+        <label>Key <input name="GEMINI_API_KEY" type="password" autocomplete="off" placeholder="AI Studio key (aistudio.google.com/apikey)"></label>
+        <label>Image model <input name="TRYON_MODEL" placeholder="gemini-2.5-flash-image"></label>
         <div class="bar">
-          <button type="button" class="primary" data-test="gemini-key">Guardar e testar chave</button>
-          <button type="button" data-test="tryon">Testar geração de imagem (gasta uma geração)</button>
+          <button type="button" class="primary" data-test="gemini-key">Save and test key</button>
+          <button type="button" data-test="tryon">Test image generation (uses one or two generations)</button>
         </div>
         <div id="result-gemini-key" class="result"></div>
         <div id="result-tryon" class="result"></div>
-        <button class="primary" id="settings-save" type="submit">Guardar</button>
+        <button class="primary" id="settings-save" type="submit">Save</button>
         <p id="settings-msg" class="muted"></p>
       </form>
     </section>
   </main>
 
   <nav>
-    <button data-tab="closet" class="active">Roupa</button>
-    <button data-tab="advise">Aconselhar</button>
-    <button data-tab="tryon">Provador</button>
-    <button data-tab="wish">Desejos</button>
-    <button data-tab="memory">Memória</button>
+    <button data-tab="closet" class="active">Wardrobe</button>
+    <button data-tab="advise">Stylist</button>
+    <button data-tab="tryon">Fitting room</button>
+    <button data-tab="wish">Wishlist</button>
+    <button data-tab="memory">Memory</button>
   </nav>
 
   <input type="file" id="bulk-file" accept="image/*" multiple hidden>
 
   <dialog id="item-dialog">
     <form id="item-form" method="dialog">
-      <h2>Editar peça</h2>
+      <h2>Edit garment</h2>
       <img id="item-preview" class="preview" alt="">
-      <label>Nome <input name="name" required></label>
-      <label>Categoria <select name="category" id="category-select" required></select></label>
+      <label>Name <input name="name" required></label>
+      <label>Category <select name="category" id="category-select" required></select></label>
       <div class="two">
-        <label>Cor <input name="color"></label>
-        <label>Tamanho <input name="size" placeholder="M, 42, 32/32…"></label>
+        <label>Colour <input name="color"></label>
+        <label>Size <input name="size" placeholder="M, 42, 32/32…"></label>
       </div>
       <div class="two">
-        <label>Marca <input name="brand"></label>
-        <label>Estação
-          <select name="season"><option value="">—</option><option>primavera/verão</option><option>outono/inverno</option><option>todo o ano</option></select>
+        <label>Brand <input name="brand"></label>
+        <label>Season
+          <select name="season"><option value="">—</option><option>spring/summer</option><option>autumn/winter</option><option>all year</option></select>
         </label>
       </div>
-      <label>Formalidade
-        <select name="formality"><option value="">—</option><option>desportivo</option><option>casual</option><option>smart casual</option><option>formal</option></select>
+      <label>Formality
+        <select name="formality"><option value="">—</option><option>sporty</option><option>casual</option><option>smart casual</option><option>formal</option></select>
       </label>
       <div class="two">
-        <label>Modelo <input name="model" placeholder="511, Palermo…"></label>
-        <label>Corte <input name="fit" placeholder="Slim, Wide, Regular…"></label>
+        <label>Model <input name="model" placeholder="511, Palermo…"></label>
+        <label>Fit <input name="fit" placeholder="Slim, Wide, Regular…"></label>
       </div>
-      <label>Material <input name="material" placeholder="Ganga, algodão, couro…"></label>
-      <label>Notas <input name="notes" placeholder="Fica justa nos ombros, só em dias de calor…"></label>
+      <label>Material <input name="material" placeholder="Denim, cotton, leather…"></label>
+      <label>Notes <input name="notes" placeholder="Tight on the shoulders, only for hot days…"></label>
       <p id="item-source" class="muted"></p>
       <p id="item-error" class="error"></p>
       <div class="bar">
-        <button type="button" id="item-delete" class="danger">Apagar</button>
-        <button type="button" id="item-cancel">Cancelar</button>
-        <button class="primary" id="item-save" type="submit">Guardar</button>
+        <button type="button" id="item-delete" class="danger">Delete</button>
+        <button type="button" id="item-cancel">Cancel</button>
+        <button class="primary" id="item-save" type="submit">Save</button>
       </div>
     </form>
   </dialog>
 
   <dialog id="import-dialog" class="wide">
-    <h2>Importar da pasta</h2>
-    <p class="muted">Uma subpasta por categoria (Tshirts, Camisas, Calças, Calções, Meias, Casacos, Sapatos, Acessórios). O nome de cada ficheiro é lido para preencher tamanho, marca, modelo, cor, corte e material. Depois podes corrigir tudo ao tocar na peça.</p>
-    <label>Pasta <input id="import-dir" placeholder="/Users/…/Desktop/Roupa"></label>
-    <div class="bar"><button id="import-scan">Procurar ficheiros</button></div>
+    <h2>Import from folder</h2>
+    <p class="muted">One subfolder per category (Tshirts, Shirts, Hoodie-Sweaters, Shorts, Trousers, Socks, Coats, Shoes, Accessories; Portuguese folder names work too). Each file name is read to fill in size, brand, model, colour, fit and material. You can correct everything afterwards by tapping the garment.</p>
+    <label>Folder <input id="import-dir" placeholder="/Users/…/Desktop/Wardrobe"></label>
+    <div class="bar"><button id="import-scan">Find files</button></div>
     <div id="import-preview"></div>
-    <label class="hidden" id="import-analyze-row">Análise com o modelo de visão
+    <label class="hidden" id="import-analyze-row">Analysis with the vision model
       <select id="import-analyze">
-        <option value="none">Não: usar só o nome do ficheiro (0 tokens)</option>
-        <option value="missing">Só nas peças sem cor no nome</option>
-        <option value="all">Em todas as peças</option>
+        <option value="none">No: use the file name only (0 tokens)</option>
+        <option value="missing">Only garments without a colour in the name</option>
+        <option value="all">All garments</option>
       </select>
       <span class="muted" id="import-estimate"></span>
     </label>
     <p id="import-progress" class="muted"></p>
-    <div class="bar"><button type="button" id="import-close">Fechar</button><button class="primary" id="import-run" disabled>Importar</button></div>
+    <div class="bar"><button type="button" id="import-close">Close</button><button class="primary" id="import-run" disabled>Import</button></div>
   </dialog>
 
   <script src="/app.js"></script>

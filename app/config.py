@@ -8,18 +8,18 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(ROOT / ".env")
 
-DATA_DIR = Path(os.getenv("WARDROBE_DATA_DIR") or ROOT / "data")  # WARDROBE_DATA_DIR serve para testes não tocarem nos teus dados
+DATA_DIR = Path(os.getenv("WARDROBE_DATA_DIR") or ROOT / "data")  # WARDROBE_DATA_DIR lets tests run without touching your real data
 UPLOAD_DIR = DATA_DIR / "uploads"
 DB_PATH = DATA_DIR / "wardrobe.db"
 THUMB_DIR = DATA_DIR / "thumbs"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 THUMB_DIR.mkdir(parents=True, exist_ok=True)
 
-# Máximo de peças por outfit / provador (mais peças numa só imagem reduz a fidelidade do Gemini).
+# Maximum garments per outfit / fitting room (more garments in a single image reduce the image model's fidelity).
 MAX_OUTFIT_ITEMS = 8
 
-# --- Definições dos modelos ---
-# Valores vêm do ficheiro data/settings.json (editado no ecrã Definições) e, na falta deles, do .env.
+# --- Model settings ---
+# Values come from data/settings.json (edited on the Models screen) and, failing that, from .env.
 SETTINGS_PATH = DATA_DIR / "settings.json"
 DEFAULTS = {
     "LLM_BASE_URL": "",
@@ -28,9 +28,9 @@ DEFAULTS = {
     "LLM_VISION_MODEL": "",
     "GEMINI_API_KEY": "",
     "TRYON_MODEL": "gemini-2.5-flash-image",
-    # API estilo Gemini (generateContent). Por defeito a da Google; pode apontar para outro fornecedor.
+    # Gemini-style API (generateContent). Google's by default; it can point to another provider.
     "TRYON_BASE_URL": "https://generativelanguage.googleapis.com/v1beta",
-    "IMPORT_DIR": str(Path.home() / "Desktop" / "Roupa"),
+    "IMPORT_DIR": str(Path.home() / "Desktop" / "Wardrobe"),
 }
 SECRETS = {"LLM_API_KEY", "GEMINI_API_KEY"}
 
@@ -50,7 +50,7 @@ def get(name: str) -> str:
 
 
 def save(values: dict) -> None:
-    """Grava só chaves conhecidas; uma chave secreta vazia significa 'não alterar'."""
+    """Save only known keys; an empty secret means 'leave unchanged'."""
     ov = _overrides()
     for name, value in values.items():
         if name not in DEFAULTS or not isinstance(value, str):
@@ -63,11 +63,11 @@ def save(values: dict) -> None:
 
 
 USER_AGENT = "ocasionly/0.1"
-SESSION_ID = str(uuid.uuid4())  # estável enquanto o servidor estiver a correr
+SESSION_ID = str(uuid.uuid4())  # stable while the server is running
 
 
 def llm_headers() -> dict:
-    """Cabeçalhos para o fornecedor de texto/visão. O opencode exige User-Agent próprio e x-opencode-session."""
+    """Headers for the text/vision provider. opencode requires its own User-Agent and x-opencode-session."""
     headers = {"Authorization": f"Bearer {get('LLM_API_KEY')}", "User-Agent": USER_AGENT}
     if "opencode.ai" in get("LLM_BASE_URL"):
         headers["x-opencode-session"] = SESSION_ID
@@ -75,7 +75,7 @@ def llm_headers() -> dict:
 
 
 def tryon_key() -> str:
-    """Chave do provador; se estiver vazia e o provador apontar para o opencode, usa a chave do opencode."""
+    """Fitting-room key; if empty and the provider points to opencode, use the opencode key."""
     key = get("GEMINI_API_KEY")
     if not key and "opencode.ai" in get("TRYON_BASE_URL"):
         key = get("LLM_API_KEY")
@@ -86,7 +86,7 @@ def tryon_headers() -> dict:
     key = tryon_key()
     base = get("TRYON_BASE_URL")
     headers = {"x-goog-api-key": key, "User-Agent": USER_AGENT}
-    # A Google trata "Authorization: Bearer" como token OAuth e rejeita chaves de API (401), por isso só vai para outros fornecedores.
+    # Google treats "Authorization: Bearer" as an OAuth token and rejects API keys (401), so it is only sent to other providers.
     if "googleapis.com" not in base:
         headers["Authorization"] = f"Bearer {key}"
     if "opencode.ai" in base:
@@ -94,7 +94,7 @@ def tryon_headers() -> dict:
     return headers
 
 
-def __getattr__(name: str) -> str:  # config.LLM_MODEL, config.GEMINI_API_KEY, ... sempre atuais
+def __getattr__(name: str) -> str:  # config.LLM_MODEL, config.GEMINI_API_KEY, ... always current
     if name in DEFAULTS:
         return get(name)
     raise AttributeError(name)

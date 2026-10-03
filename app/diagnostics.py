@@ -1,4 +1,4 @@
-"""Testes aos modelos configurados: cada função devolve {ok, ms, ...} e nunca lança."""
+"""Tests for the configured models: each function returns {ok, ms, ...} and never raises."""
 import io
 import time
 
@@ -19,76 +19,76 @@ def _timed(fn) -> dict:
 
 
 def text() -> dict:
-    """Testa o modelo de texto e se consegue devolver JSON (a app precisa disso)."""
+    """Test the text model, and whether it can return JSON (the app needs that)."""
     def run():
         model = config.LLM_MODEL
         if not model:
-            raise AIError("Define o modelo de texto.")
-        raw = ai._chat([{"role": "user", "content": 'Responde APENAS com JSON: {"cor":"azul","numero":3}'}], model, json_mode=True)
+            raise AIError("Set the text model.")
+        raw = ai._chat([{"role": "user", "content": 'Reply ONLY with JSON: {"color":"blue","number":3}'}], model, json_mode=True)
         try:
             data = ai._extract_json(raw)
-            json_ok = data.get("cor") == "azul"
+            json_ok = data.get("color") == "blue"
         except AIError:
             json_ok = False
         return {"model": model, "reply": raw.strip()[:200], "json_ok": json_ok,
-                "note": "" if json_ok else "Respondeu, mas não devolveu o JSON pedido. Os conselhos podem falhar com este modelo."}
+                "note": "" if json_ok else "It answered, but did not return the requested JSON. Styling advice may fail with this model."}
     return _timed(run)
 
 
 def vision() -> dict:
-    """Envia um quadrado vermelho e pergunta a cor: confirma que o modelo vê mesmo imagens."""
+    """Send a red square and ask for its colour: confirms that the model really sees images."""
     def run():
         model = config.LLM_VISION_MODEL
         if not model:
-            raise AIError("Define o modelo com visão.")
+            raise AIError("Set the vision model.")
         buf = io.BytesIO()
         Image.new("RGB", (160, 160), (220, 20, 20)).save(buf, "JPEG")
         import base64
         b64 = base64.b64encode(buf.getvalue()).decode()
         content = [
-            {"type": "text", "text": "Qual é a cor dominante desta imagem? Responde numa só palavra, em português."},
+            {"type": "text", "text": "What is the dominant colour of this image? Answer in a single word."},
             {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{b64}"}},
         ]
         raw = ai._chat([{"role": "user", "content": content}], model, json_mode=False)
-        saw = any(w in raw.lower() for w in ("vermelh", "red", "encarnad", "rubro"))
+        saw = any(w in raw.lower() for w in ("red", "crimson", "scarlet", "vermelh"))
         return {"model": model, "reply": raw.strip()[:200], "sees_image": saw,
-                "note": "" if saw else "Respondeu, mas não identificou a cor: este modelo pode não aceitar imagens."}
+                "note": "" if saw else "It answered, but did not identify the colour: this model may not accept images."}
     return _timed(run)
 
 
 def models() -> dict:
-    """Lista os modelos que o fornecedor de texto/visão diz ter (GET /models)."""
+    """List the models the text/vision provider says it has (GET /models)."""
     if not (config.LLM_BASE_URL and config.LLM_API_KEY):
-        return {"ok": False, "error": "Define o URL base e a chave primeiro.", "models": []}
+        return {"ok": False, "error": "Set the base URL and the key first.", "models": []}
     try:
         r = httpx.get(f"{config.LLM_BASE_URL}/models", headers=config.llm_headers(), timeout=15)
         r.raise_for_status()
         ids = sorted({m["id"] for m in r.json().get("data", []) if "id" in m})
         return {"ok": True, "models": ids}
     except (httpx.HTTPError, ValueError, KeyError) as e:
-        return {"ok": False, "error": f"Não consegui listar os modelos ({e.__class__.__name__}). Escreve o nome à mão.", "models": []}
+        return {"ok": False, "error": f"Could not list the models ({e.__class__.__name__}). Type the name by hand.", "models": []}
 
 
 def gemini_key() -> dict:
-    """Gratuito: valida a chave e confirma que o modelo do provador existe."""
+    """Free: validates the key and confirms that the fitting-room model exists."""
     def run():
         if not config.tryon_key():
-            raise AIError("Define a chave do provador.")
+            raise AIError("Set the fitting-room key.")
         try:
             r = httpx.get(f"{config.TRYON_BASE_URL}/models/{config.TRYON_MODEL}", headers=config.tryon_headers(), timeout=15)
         except httpx.HTTPError as e:
-            raise AIError(f"Sem ligação ao provador ({e.__class__.__name__}).") from e
+            raise AIError(f"Could not reach the fitting-room provider ({e.__class__.__name__}).") from e
         if r.status_code in (400, 401, 403):
-            raise AIError("Chave do provador inválida ou sem permissões.")
+            raise AIError("Fitting-room key is invalid or lacks permissions.")
         if r.status_code == 404:
-            raise AIError(f"O modelo «{config.TRYON_MODEL}» não foi encontrado neste endereço. Se usas o opencode, este fornecedor pode não ter modelos de imagem: confirma com o teste de geração.")
+            raise AIError(f"The model «{config.TRYON_MODEL}» was not found at this address. If you use opencode, this provider may not have image models: confirm with the generation test.")
         r.raise_for_status()
-        return {"model": config.TRYON_MODEL, "note": "Chave e modelo aceites. Isto não confirma a quota nem a faturação: usa o teste de geração."}
+        return {"model": config.TRYON_MODEL, "note": "Key and model accepted. This does not confirm quota or billing: use the generation test."}
     return _timed(run)
 
 
 def tryon_generation() -> dict:
-    """Gera mesmo uma imagem com figuras sintéticas (custa uma geração) para confirmar que o Gemini devolve imagem."""
+    """Really generate an image from synthetic figures (costs one generation) to confirm that the model returns an image."""
     def run():
         person = Image.new("RGB", (512, 768), (235, 235, 235))
         d = ImageDraw.Draw(person)
@@ -103,10 +103,10 @@ def tryon_generation() -> dict:
             img.save(buf, "PNG")
             names.append(images.save_upload(buf.getvalue(), prefix))
         try:
-            raw = tryon.generate(names[0], [names[1]], ["t-shirt azul"])
+            raw = tryon.generate(names[0], [names[1]], ["blue t-shirt"])
         finally:
             for n in names:
                 images.delete(n)
         out = images.save_bytes(raw, "tryon")
-        return {"model": config.TRYON_MODEL, "image_url": f"/uploads/{out}", "note": "Recebi uma imagem. A qualidade com fotos reais vê-se no Provador."}
+        return {"model": config.TRYON_MODEL, "image_url": f"/uploads/{out}", "note": "Received an image. Quality with real photos can be judged in the Fitting room."}
     return _timed(run)

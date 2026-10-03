@@ -39,7 +39,7 @@ def put_settings(body: SettingsIn):
     for field in ("LLM_BASE_URL", "TRYON_BASE_URL"):
         url = values.get(field)
         if url and not url.startswith(("http://", "https://")):
-            raise HTTPException(400, "Os URLs têm de começar por http:// ou https://.")
+            raise HTTPException(400, "URLs must start with http:// or https://.")
     config.save(values)
     return _public()
 

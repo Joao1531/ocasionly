@@ -1,7 +1,7 @@
 [project]
 name = "ocasionly"
 version = "0.1.0"
-description = "Guarda-roupa pessoal com recomendações de outfits e provador virtual"
+description = "Personal wardrobe manager with an AI stylist, a virtual fitting room and a wishlist"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

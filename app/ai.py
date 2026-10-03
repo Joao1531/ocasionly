@@ -3,11 +3,11 @@ import re
 
 import httpx
 
-from . import config, images
+from . import config, db, images, vocab
 
 TIMEOUT = httpx.Timeout(120.0)
 
-# Consumo desde que o servidor arrancou (o fornecedor devolve `usage` em cada resposta).
+# Usage since the server started (the provider returns `usage` in every response).
 USAGE = {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0}
 
 
@@ -37,14 +37,14 @@ def _post(body: dict) -> httpx.Response:
 
 def _chat(messages: list, model: str, json_mode: bool = False) -> str:
     if not (config.LLM_BASE_URL and config.LLM_API_KEY and model):
-        raise AIError("Modelo de IA não configurado. Preenche LLM_* no ficheiro .env.")
+        raise AIError("The AI model is not configured. Open ⚙ Models and fill in the connection settings.")
     body = {"model": model, "messages": messages, "temperature": 0.7}
     if json_mode:
         body["response_format"] = {"type": "json_object"}
     try:
         r = _post(body)
         if r.status_code == 400 and json_mode:
-            # Alguns modelos não suportam response_format: tenta sem.
+            # Some models do not support response_format: try again without it.
             body.pop("response_format")
             r = _post(body)
         r.raise_for_status()
@@ -52,9 +52,9 @@ def _chat(messages: list, model: str, json_mode: bool = False) -> str:
         _record(data)
         return data["choices"][0]["message"]["content"] or ""
     except httpx.HTTPStatusError as e:
-        raise AIError(f"Erro do modelo ({e.response.status_code}): {e.response.text[:300]}") from e
+        raise AIError(f"Model error ({e.response.status_code}): {e.response.text[:300]}") from e
     except (httpx.HTTPError, KeyError, IndexError) as e:
-        raise AIError(f"Falha a contactar o modelo: {e}") from e
+        raise AIError(f"Could not reach the model: {e}") from e
 
 
 def _extract_json(text: str) -> dict:
@@ -64,14 +64,14 @@ def _extract_json(text: str) -> dict:
         text = fence.group(1).strip()
     start, end = text.find("{"), text.rfind("}")
     if start == -1 or end == -1:
-        raise AIError("O modelo não devolveu JSON válido.")
+        raise AIError("The model did not return valid JSON.")
     try:
         return json.loads(text[start : end + 1])
     except json.JSONDecodeError as e:
-        raise AIError("O modelo devolveu JSON inválido.") from e
+        raise AIError("The model returned malformed JSON.") from e
 
 
-KINDS = ("preferência", "regra", "facto")
+KINDS = ("preference", "rule", "fact")
 
 
 def _clean_learned(raw) -> list[dict]:
@@ -80,79 +80,92 @@ def _clean_learned(raw) -> list[dict]:
         text = (x.get("text") if isinstance(x, dict) else x) or ""
         text = str(text).strip()[:200]
         if text:
-            kind = x.get("kind") if isinstance(x, dict) and x.get("kind") in KINDS else "facto"
+            kind = x.get("kind") if isinstance(x, dict) and x.get("kind") in KINDS else "fact"
             out.append({"text": text, "kind": kind})
     return out[:5]
 
 
-ANALYZE_SIDE = 384  # cor/estação/formalidade não precisam de resolução alta: menos tokens por foto
+ANALYZE_SIDE = 384  # colour/season/formality do not need high resolution: fewer tokens per photo
+SEASONS = ("spring/summer", "autumn/winter", "all year")
+FORMALITIES = ("sporty", "casual", "smart casual", "formal")
 
 
 def analyze_item(image_name: str) -> dict:
-    """Usa um modelo com visão para sugerir os campos de uma peça."""
+    """Use a vision model to suggest the fields of a garment."""
     prompt = (
-        "Analisa esta peça de roupa e responde APENAS com JSON com as chaves: "
-        '"name" (nome curto em português de Portugal; para acessórios diz o tipo: cinto, chapéu, óculos de sol, relógio, etc.), "category" (uma de: t-shirt, camisa, camisola, calções, calças, meias, casaco, sapatos, acessórios; "camisola" inclui hoodies, sweats e camisolas de malha), "color" (cor principal), '
-        '"season" (primavera/verão, outono/inverno ou todo o ano), '
-        '"formality" (desportivo, casual, smart casual ou formal).'
+        "Analyse this garment and reply ONLY with JSON containing these keys: "
+        '"name" (short English name; for accessories state the type: belt, hat, sunglasses, watch, etc.), '
+        f'"category" (one of: {", ".join(db.CATEGORY_IDS)}; "sweater" includes hoodies, sweatshirts and knitted jumpers), '
+        '"color" (main colour, in English), '
+        f'"season" (one of: {", ".join(SEASONS)}), '
+        f'"formality" (one of: {", ".join(FORMALITIES)}).'
     )
     content = [
         {"type": "text", "text": prompt},
         {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{images.read_b64(image_name, ANALYZE_SIDE)}"}},
     ]
     data = _extract_json(_chat([{"role": "user", "content": content}], config.LLM_VISION_MODEL, json_mode=True))
-    return {k: str(data.get(k, "")) for k in ("name", "category", "color", "season", "formality")}
+    category = str(data.get("category", "")).strip().lower()
+    season = vocab.LEGACY_SEASONS.get(str(data.get("season", "")).strip().lower(), str(data.get("season", "")).strip().lower())
+    formality = vocab.LEGACY_FORMALITY.get(str(data.get("formality", "")).strip().lower(), str(data.get("formality", "")).strip().lower())
+    return {
+        "name": str(data.get("name", "")).strip(),
+        "category": vocab.LEGACY_CATEGORIES.get(category, category) if vocab.LEGACY_CATEGORIES.get(category, category) in db.CATEGORY_IDS else "",
+        "color": vocab.translate_color(str(data.get("color", ""))),  # also accepts Portuguese answers
+        "season": season if season in SEASONS else "",
+        "formality": formality if formality in FORMALITIES else "",
+    }
 
 
-SYSTEM_TEMPLATE = """És um estilista pessoal. Falas português de Portugal, de forma direta e amigável.
-Recebes o guarda-roupa do utilizador: cada peça tem um id, um ficheiro e (quando disponível) a fotografia. Recebes também um pedido (evento, clima, ocasião).
-Olha para as fotografias e monta 2 a 3 outfits usando APENAS peças da lista, referenciadas pelo id.
-Considera: adequação ao evento, clima/estação, formalidade, combinação de cores e padrões (vê as fotos), tamanhos e o perfil do utilizador.
-O guarda-roupa só tem estas categorias: t-shirt, camisa, camisola (hoodies, sweats e camisolas de malha), calções, calças, meias, casaco, sapatos, acessórios (cinto, chapéu, óculos de sol, relógio, etc.; o tipo vem no nome).
-Cada outfit deve ser vestível de uma só vez: uma t-shirt OU uma camisa, com uma camisola/hoodie por cima se o clima ou o estilo pedirem (a camisola faz de camada intermédia entre a t-shirt/camisa e o casaco), calças OU calções, meias se fizerem falta, um casaco se o clima ou o evento pedirem, um par de sapatos adequado ao evento e, se acrescentarem ao look, acessórios (cinto a condizer com os sapatos, relógio, óculos de sol só se o evento e o clima fizerem sentido, chapéu só se combinar). Nunca dois acessórios do mesmo tipo. No máximo {max} peças; se houver mais candidatas, prioriza as que mais contam para o look.
-Se faltar uma peça essencial, diz isso em "missing" em vez de inventar peças.
+SYSTEM_TEMPLATE = """You are a personal stylist. You speak English, in a direct and friendly way.
+You receive the user's wardrobe: each garment has an id, a file name and (when available) a photo. You also receive a request (event, weather, occasion).
+Look at the photos and put together 2 to 3 outfits using ONLY garments from the list, referenced by id.
+Consider: suitability for the event, weather/season, formality, colour and pattern combinations (look at the photos), sizes and the user's profile.
+The wardrobe only has these categories: tshirt, shirt, sweater (hoodies, sweatshirts and knitted jumpers), shorts, trousers, socks, coat, shoes, accessories (belt, hat, sunglasses, watch, etc.; the type is in the name).
+Each outfit must be wearable all at once: one T-shirt OR one shirt, with a sweater/hoodie on top if the weather or style calls for it (the sweater is the middle layer between the T-shirt/shirt and the coat), trousers OR shorts, socks if they are needed, a coat if the weather or the event calls for one, a pair of shoes suited to the event and, if they add to the look, accessories (a belt matching the shoes, a watch, sunglasses only if the event and weather make sense, a hat only if it works). Never two accessories of the same type. At most {max} garments; if there are more candidates, prioritise the ones that matter most to the look.
+If an essential garment is missing, say so in "missing" instead of inventing garments.
 
-MEDIDAS: o perfil inclui altura, peso e tamanhos habituais do utilizador (quando indicados). Usa-os a sério:
-- Compara o tamanho de cada peça escolhida com o tamanho habitual da categoria e diz em "fit_note" se deve servir bem, ficar largo ou justo (ex.: «esta camisa é L e usas M: fica larga nos ombros»). Prefere peças cujo tamanho coincide com o habitual; se escolheres uma que não coincide, justifica.
-- Se a peça não tem tamanho indicado ou não sabes o tamanho habitual, não inventes: diz que não é possível confirmar o ajuste.
-- Usa a altura e o peso para proporções: comprimento de casacos e mangas, calças a condizer com a estatura, cortes que favorecem a silhueta.
+MEASUREMENTS: the profile includes the user's height, weight and usual sizes (when provided). Use them properly:
+- Compare the size of each chosen garment with the usual size for its category and say in "fit_note" whether it should fit well, loose or tight (e.g. "this shirt is L and you wear M: it will be loose on the shoulders"). Prefer garments whose size matches the usual one; if you choose one that does not match, justify it.
+- If a garment has no size, or you do not know the usual size, do not make one up: say that the fit cannot be confirmed.
+- Use height and weight for proportions: length of coats and sleeves, trousers that suit the person's height, cuts that flatter the silhouette.
 
-MEMÓRIA: és um estilista que conhece o utilizador há muito tempo. Recebes o perfil base, a memória (o que já aprendeste) e o histórico recente de pedidos e reações.
-- Respeita a memória como regras e gostos já confirmados; não voltes a perguntar o que já sabes. Se algo no pedido contradiz a memória, o pedido atual manda.
-- Usa o histórico para dar continuidade (o utilizador pode dizer "e com outros sapatos?") e para não repetires outfits que ele recusou ou que já te sugeriu há pouco, salvo se ele pedir.
-- Em "learned" lista novos factos DURÁVEIS que o utilizador afirmou de forma explícita no pedido atual (gostos, regras, medidas, hábitos, restrições, ex.: "Não uso castanho", "Prefere camisas por fora"). NÃO guardes detalhes do evento de hoje, nem coisas já presentes na memória, nem deduções tuas. Se não houver nada, devolve [].
-Responde APENAS com JSON neste formato:
-{"outfits":[{"title":"...","item_ids":[1,2],"why":"porque funciona para este evento","how_to_wear":"como vestir/combinar (mangas, por dentro/fora, etc.)","fit_note":"o que lhe ficará melhor e porquê","missing":""}],
-"general_tip":"conselho final curto","learned":[{"text":"facto curto e autónomo","kind":"preferência|regra|facto"}]}"""
+MEMORY: you are a stylist who has known the user for a long time. You receive the base profile, the memory (what you have already learned) and the recent history of requests and reactions.
+- Respect the memory as confirmed rules and tastes; do not ask again what you already know. If something in the request contradicts the memory, the current request wins.
+- Use the history for continuity (the user may say "and with other shoes?") and to avoid repeating outfits the user rejected or that you suggested recently, unless they ask.
+- In "learned" list new DURABLE facts that the user explicitly stated in the current request (tastes, rules, measurements, habits, restrictions, e.g. "I don't wear brown", "I prefer shirts untucked"). Do NOT store details of today's event, things already in the memory, or your own inferences. If there is nothing, return [].
+Reply ONLY with JSON in this format:
+{"outfits":[{"title":"...","item_ids":[1,2],"why":"why it works for this event","how_to_wear":"how to wear and combine it (sleeves, tucked in or out, etc.)","fit_note":"what will suit them best and why","missing":""}],
+"general_tip":"short closing tip","learned":[{"text":"short, self-contained fact","kind":"preference|rule|fact"}]}"""
 
 SYSTEM = SYSTEM_TEMPLATE.replace("{max}", str(config.MAX_OUTFIT_ITEMS))
 
-MAX_IMAGES = 24       # fotos enviadas por pedido
-THUMB = 400           # lado maior das fotos enviadas (menos tokens por foto)
-SHORTLIST_ABOVE = MAX_IMAGES  # com mais peças que isto, primeiro escolhe-se uma lista curta só com texto
+MAX_IMAGES = 24       # photos sent per request
+THUMB = 400           # longest side of the photos sent (fewer tokens per photo)
+SHORTLIST_ABOVE = MAX_IMAGES  # above this many garments, a text-only shortlist is made first
 MAX_CANDIDATES = 24
 
 CATALOG_FIELDS = ("category", "name", "color", "size", "brand", "model", "fit", "material", "season", "formality", "notes")
-CATALOG_HEADER = "id|categoria|nome|cor|tamanho|marca|modelo|corte|material|estação|formalidade|notas   (campo vazio = desconhecido)"
+CATALOG_HEADER = "id|category|name|color|size|brand|model|fit|material|season|formality|notes   (empty field = unknown)"
 
 
 def catalog_line(it: dict) -> str:
-    """Uma linha compacta por peça: bastante menos tokens do que um JSON por peça."""
+    """One compact line per garment: far fewer tokens than one JSON object per garment."""
     return "|".join([str(it["id"])] + [str(it.get(k) or "").replace("|", "/").replace("\n", " ") for k in CATALOG_FIELDS])
 
 
-SHORTLIST_SYSTEM = """És um estilista pessoal. Recebes o catálogo do guarda-roupa (uma peça por linha), o perfil e a memória do utilizador e um pedido.
-Escolhe até {n} ids das peças MAIS relevantes para montar outfits para esse pedido: evento, clima, formalidade, regras da memória, tamanhos habituais.
-Garante variedade suficiente: várias opções de cada categoria necessária (parte de cima, parte de baixo, sapatos, casaco se o clima pedir, acessórios úteis).
-Deixa de fora peças que quebram regras da memória (ex.: cores que o utilizador evita) ou que não servem ao pedido.
-Responde APENAS com JSON: {{"ids":[1,2,3]}}"""
+SHORTLIST_SYSTEM = """You are a personal stylist. You receive the wardrobe catalogue (one garment per line), the user's profile and memory, and a request.
+Choose up to {n} ids of the garments that are MOST relevant for putting together outfits for that request: event, weather, formality, memory rules, usual sizes.
+Make sure there is enough variety: several options in each category that is needed (tops, bottoms, shoes, a coat if the weather calls for one, useful accessories).
+Leave out garments that break memory rules (e.g. colours the user avoids) or that do not suit the request.
+Reply ONLY with JSON: {{"ids":[1,2,3]}}"""
 
 
 def _shortlist(prompt: str, items: list[dict], profile: str, memory_text: str) -> list[int]:
     user = (
-        f"Perfil: {profile or 'não indicado'}\nMemória:\n{memory_text or '(vazia)'}\n\nCatálogo ({len(items)} peças):\n{CATALOG_HEADER}\n"
+        f"Profile: {profile or 'not provided'}\nMemory:\n{memory_text or '(empty)'}\n\nCatalogue ({len(items)} garments):\n{CATALOG_HEADER}\n"
         + "\n".join(catalog_line(it) for it in items)
-        + f"\n\nPedido: {prompt}"
+        + f"\n\nRequest: {prompt}"
     )
     data = _extract_json(_chat(
         [{"role": "system", "content": SHORTLIST_SYSTEM.format(n=MAX_CANDIDATES)}, {"role": "user", "content": user}],
@@ -166,8 +179,8 @@ def _shortlist(prompt: str, items: list[dict], profile: str, memory_text: str) -
 
 
 def advise(prompt: str, items: list[dict], profile: str, memory_text: str = "", history_text: str = "") -> dict:
-    """Com muitas peças, uma 1.ª chamada só de texto escolhe candidatas; só dessas se enviam fotos (e dados completos).
-    Se houver modelo com visão, o estilista vê as fotos dessas peças; senão usa só os dados."""
+    """With many garments, a first text-only call picks candidates; only those are sent with photos and full data.
+    If a vision model is configured the stylist sees the photos of those garments; otherwise it uses the data only."""
     start = dict(USAGE)
     all_items = items
     note = ""
@@ -180,20 +193,20 @@ def advise(prompt: str, items: list[dict], profile: str, memory_text: str = "", 
             keep = set(ids)
             items = [it for it in items if it["id"] in keep]
         else:
-            note = "A lista curta falhou: usei todo o catálogo, sem fotos."
-    # Fotos só quando o conjunto é pequeno: ≤ MAX_IMAGES peças, ou a lista curta funcionou.
+            note = "The shortlist step failed: I used the whole catalogue, without photos."
+    # Photos only when the set is small: at most MAX_IMAGES garments, or the shortlist worked.
     vision = bool(config.LLM_VISION_MODEL) and not note
     model = config.LLM_VISION_MODEL if vision else config.LLM_MODEL
 
-    # O catálogo (e as fotos) vai primeiro e o que muda a cada pedido vai no fim: ajuda a cache de prompt do fornecedor.
-    content = [{"type": "text", "text": f"Guarda-roupa ({len(items)} peças):\n{CATALOG_HEADER}"}]
+    # The catalogue (and photos) go first and what changes on every request goes last: helps the provider's prompt cache.
+    content = [{"type": "text", "text": f"Wardrobe ({len(items)} garments):\n{CATALOG_HEADER}"}]
     for n, it in enumerate(items):
-        content.append({"type": "text", "text": catalog_line(it) + f"  (ficheiro {it['image']})"})
+        content.append({"type": "text", "text": catalog_line(it) + f"  (file {it['image']})"})
         if vision and n < MAX_IMAGES:
             content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{images.read_b64(it['image'], THUMB)}"}})
     content.append({"type": "text", "text": (
-        f"Perfil base do utilizador: {profile or 'não indicado'}\n\nMemória (o que já sabes):\n{memory_text or '(vazia)'}\n\n"
-        f"Histórico recente:\n{history_text or '(sem histórico)'}\n\nPedido: {prompt}")})
+        f"User's base profile: {profile or 'not provided'}\n\nMemory (what you already know):\n{memory_text or '(empty)'}\n\n"
+        f"Recent history:\n{history_text or '(no history)'}\n\nRequest: {prompt}")})
 
     data = _extract_json(_chat([{"role": "system", "content": SYSTEM}, {"role": "user", "content": content}], model, json_mode=True))
     data["learned"] = _clean_learned(data.get("learned"))
@@ -205,42 +218,42 @@ def advise(prompt: str, items: list[dict], profile: str, memory_text: str = "", 
     return data
 
 
-SUGGEST_SYSTEM = """És um estilista pessoal. Falas português de Portugal.
-Com base no guarda-roupa do utilizador (peças com id), no perfil (altura, peso e tamanhos incluídos: sugere tamanhos que lhe sirvam) e nas lojas, sugere 4 a 6 peças NOVAS que valia a pena comprar:
-peças que faltam, que combinam com várias das que já tem, ou que elevam os looks. Não repitas peças que ele já tem nem itens da lista de desejos.
-Para cada sugestão escolhe uma categoria (t-shirt, camisa, camisola, calções, calças, meias, casaco, sapatos, acessórios), indica ids das peças do armário com que combina, e a loja.
-Lojas: usa APENAS lojas da lista "com interesse"; nunca uses as da lista "sem interesse". Se a lista de interesse estiver vazia, deixa "store" vazio.
-Não inventas links nem preços: dá uma "search_query" curta e precisa (tipo de peça, cor, corte, material) para ele pesquisar.
-Responde APENAS com JSON:
-{"suggestions":[{"title":"...","category":"calças","why":"porque lhe serve, com o que combina","combines_with":[1,2],"store":"","search_query":"..."}]}"""
+SUGGEST_SYSTEM = """You are a personal stylist. You speak English.
+Based on the user's wardrobe (garments with id), their profile (height, weight and sizes included: suggest sizes that will fit) and their stores, suggest 4 to 6 NEW garments worth buying:
+garments that are missing, that go with several of the ones they already own, or that elevate their looks. Do not repeat garments they already own or items already on the wishlist.
+For each suggestion choose a category (tshirt, shirt, sweater, shorts, trousers, socks, coat, shoes, accessories), give the ids of the wardrobe garments it goes with, and the store.
+Stores: use ONLY stores from the "interested" list; never use the ones from the "not interested" list. If the interested list is empty, leave "store" empty.
+Do not invent links or prices: give a short, precise "search_query" (garment type, colour, cut, material) so they can search for it.
+Reply ONLY with JSON:
+{"suggestions":[{"title":"...","category":"trousers","why":"why it suits them and what it goes with","combines_with":[1,2],"store":"","search_query":"..."}]}"""
 
 
 def suggest_purchases(prompt: str, items: list[dict], profile: str, liked: list[str], avoided: list[str], wishes: list[str], memory_text: str = "") -> dict:
     wardrobe = CATALOG_HEADER + "\n" + "\n".join(catalog_line(it) for it in items)
     user = (
-        f"Perfil: {profile or 'não indicado'}\n"
-        f"Memória (gostos, regras e factos já confirmados; respeita-os):\n{memory_text or '(vazia)'}\n"
-        f"Lojas com interesse: {', '.join(liked) or 'nenhuma indicada'}\n"
-        f"Lojas sem interesse: {', '.join(avoided) or 'nenhuma'}\n"
-        f"Já na lista de desejos: {'; '.join(wishes) or 'nada'}\n\n"
-        f"Guarda-roupa:\n{wardrobe}\n\n"
-        f"Pedido do utilizador: {prompt or 'Sugere o que me falta ou o que mais valorizaria o meu armário.'}"
+        f"Profile: {profile or 'not provided'}\n"
+        f"Memory (tastes, rules and facts already confirmed; respect them):\n{memory_text or '(empty)'}\n"
+        f"Interested stores: {', '.join(liked) or 'none provided'}\n"
+        f"Not interested stores: {', '.join(avoided) or 'none'}\n"
+        f"Already on the wishlist: {'; '.join(wishes) or 'nothing'}\n\n"
+        f"Wardrobe:\n{wardrobe}\n\n"
+        f"User's request: {prompt or 'Suggest what I am missing or what would improve my wardrobe the most.'}"
     )
     data = _extract_json(_chat([{"role": "system", "content": SUGGEST_SYSTEM}, {"role": "user", "content": user}], config.LLM_MODEL, json_mode=True))
     data["suggestions"] = [s for s in data.get("suggestions", []) if isinstance(s, dict) and s.get("title")]
     return data
 
 
-FEEDBACK_SYSTEM = """Aprendes com o feedback do utilizador sobre um outfit que sugeriste.
-Extrai 0 a 3 factos DURÁVEIS e gerais sobre os gostos ou regras dele (não sobre este evento em concreto), em frases curtas e autónomas em português de Portugal.
-Não repitas o que já está na memória. Se o comentário for só sobre este evento, devolve [].
-Responde APENAS com JSON: {"learned":[{"text":"...","kind":"preferência|regra|facto"}]}"""
+FEEDBACK_SYSTEM = """You learn from the user's feedback on an outfit you suggested.
+Extract 0 to 3 DURABLE, general facts about their tastes or rules (not about this specific event), as short self-contained sentences in English.
+Do not repeat what is already in the memory. If the comment is only about this event, return [].
+Reply ONLY with JSON: {"learned":[{"text":"...","kind":"preference|rule|fact"}]}"""
 
 
 def learn_from_feedback(outfit_desc: str, rating: int, comment: str, memory_text: str) -> list[dict]:
     user = (
-        f"Outfit sugerido: {outfit_desc}\nReação: {'gostou' if rating > 0 else 'não gostou'}\n"
-        f"Comentário: {comment}\n\nMemória atual:\n{memory_text or '(vazia)'}"
+        f"Suggested outfit: {outfit_desc}\nReaction: {'liked it' if rating > 0 else 'did not like it'}\n"
+        f"Comment: {comment}\n\nCurrent memory:\n{memory_text or '(empty)'}"
     )
     data = _extract_json(_chat([{"role": "system", "content": FEEDBACK_SYSTEM}, {"role": "user", "content": user}], config.LLM_MODEL, json_mode=True))
     return _clean_learned(data.get("learned"))

@@ -4,9 +4,9 @@ const api = async (url, opts) => {
   if (!r.ok) {
     let msg = r.statusText;
     try { msg = (await r.json()).detail || msg; } catch {}
-    // 404/405 genéricos numa rota /api/ = o servidor em execução é anterior a esta versão do ecrã
+    // A generic 404/405 on an /api/ route = the running server predates this version of the page
     if ((r.status === 404 || r.status === 405) && String(url).startsWith("/api/") && ["Not Found", "Method Not Allowed"].includes(msg)) {
-      msg = "O servidor está desatualizado. Pára-o no terminal (Ctrl+C) e arranca-o outra vez com: uv run uvicorn app.main:app --port 8000 --reload";
+      msg = "The server is out of date. Stop it in the terminal (Ctrl+C) and start it again with: uv run uvicorn app.main:app --port 8000 --reload";
     }
     throw new Error(msg);
   }
@@ -34,10 +34,10 @@ function showTab(name) {
 document.querySelectorAll("nav button").forEach((b) => b.addEventListener("click", () => showTab(b.dataset.tab)));
 $("#settings-btn").addEventListener("click", () => showTab("settings"));
 
-// ---------- Armário por categorias ----------
+// ---------- Wardrobe by category ----------
 let closetView = localStorage.getItem("closetView") || "mini";
-let closetCat = localStorage.getItem("closetCat") || "";  // "" = todas as categorias
-let justAdded = new Set();  // peças acabadas de adicionar: entram com animação
+let closetCat = localStorage.getItem("closetCat") || "";  // "" = all categories
+let justAdded = new Set();  // garments just added: they animate in
 
 const miniHtml = (it, extra = "") => `
   <div class="mini ${extra}" data-id="${it.id}" title="${esc(it.name)}">
@@ -48,30 +48,30 @@ const miniHtml = (it, extra = "") => `
 const cardHtml = (it, extra = "") => `
   <div class="card ${extra}" data-id="${it.id}">
     <img src="${it.image_url}" loading="lazy" alt="">
-    <div class="meta"><b>${esc(it.name)}</b>${esc([it.brand, it.model, it.size && "tam. " + it.size].filter(Boolean).join(" · "))}</div>
+    <div class="meta"><b>${esc(it.name)}</b>${esc([it.brand, it.model, it.size && "size " + it.size].filter(Boolean).join(" · "))}</div>
   </div>`;
 
-// Desenha todas as categorias com as suas peças. `withAdd` mostra o botão de adicionar fotos.
+// Draws every category with its garments. `withAdd` shows the add-photos button.
 function groupsHtml({ withAdd = false, selected = null, mini = false, only = "" } = {}) {
   const known = new Set(status.categories.map((c) => c.id));
   const groups = status.categories.map((c) => ({ ...c, list: items.filter((i) => i.category === c.id) }));
   const loose = items.filter((i) => !known.has(i.category));
-  if (loose.length) groups.push({ id: "", label: "Sem categoria", list: loose });
+  if (loose.length) groups.push({ id: "", label: "Uncategorised", list: loose });
   return groups.filter((g) => !only || g.id === only).map((g) => `
     <div class="group">
       <div class="group-head">
         <h2>${esc(g.label)} <span class="muted">${g.list.length}</span></h2>
-        ${withAdd && g.id ? `<button data-add="${g.id}">+ Adicionar fotos</button>` : ""}
+        ${withAdd && g.id ? `<button data-add="${g.id}">+ Add photos</button>` : ""}
       </div>
       ${mini
-        ? `<div class="shelf">${g.list.map((i) => miniHtml(i, (selected?.has(i.id) ? "selected " : "") + (justAdded.has(i.id) ? "pop" : ""))).join("")}${withAdd && g.id ? `<button class="mini add" data-add="${g.id}" title="Adicionar fotos"><b>+</b></button>` : ""}</div>${g.list.length || withAdd ? "" : '<p class="muted empty">Ainda sem peças.</p>'}`
-        : g.list.length ? `<div class="grid">${g.list.map((i) => cardHtml(i, selected?.has(i.id) ? "selected" : "")).join("")}</div>` : '<p class="muted empty">Ainda sem peças.</p>'}
+        ? `<div class="shelf">${g.list.map((i) => miniHtml(i, (selected?.has(i.id) ? "selected " : "") + (justAdded.has(i.id) ? "pop" : ""))).join("")}${withAdd && g.id ? `<button class="mini add" data-add="${g.id}" title="Add photos"><b>+</b></button>` : ""}</div>${g.list.length || withAdd ? "" : '<p class="muted empty">No garments yet.</p>'}`
+        : g.list.length ? `<div class="grid">${g.list.map((i) => cardHtml(i, selected?.has(i.id) ? "selected" : "")).join("")}</div>` : '<p class="muted empty">No garments yet.</p>'}
     </div>`).join("");
 }
 
-// Abas por categoria: "Todas" mostra tudo; cada aba mostra só essa categoria.
+// Category tabs: "All" shows everything; each tab shows only that category.
 function renderCatTabs() {
-  const tabs = [{ id: "", label: "Todas", n: items.length }, ...status.categories.map((c) => ({ id: c.id, label: c.label, n: items.filter((i) => i.category === c.id).length }))];
+  const tabs = [{ id: "", label: "All", n: items.length }, ...status.categories.map((c) => ({ id: c.id, label: c.label, n: items.filter((i) => i.category === c.id).length }))];
   const box = $("#cat-tabs");
   box.innerHTML = tabs.map((t) => `<button data-cat="${esc(t.id)}" class="${t.id === closetCat ? "on" : ""}">${esc(t.label)} <small>${t.n}</small></button>`).join("");
   box.querySelectorAll("button").forEach((b) => b.addEventListener("click", () => {
@@ -106,7 +106,7 @@ document.querySelectorAll("#view-toggle button").forEach((b) => b.addEventListen
   renderCloset();
 }));
 
-// Adicionar várias fotos de uma vez a uma categoria; o modelo com visão sugere nome/cor/estação.
+// Add several photos at once to a category; the vision model suggests name/colour/season.
 $("#bulk-file").addEventListener("change", async (e) => {
   const files = [...e.target.files];
   e.target.value = "";
@@ -115,7 +115,7 @@ $("#bulk-file").addEventListener("change", async (e) => {
   const progress = $("#progress");
   let failed = 0;
   for (const [n, f] of files.entries()) {
-    progress.textContent = `A guardar ${n + 1}/${files.length}…`;
+    progress.textContent = `Saving ${n + 1}/${files.length}…`;
     let s = {};
     if (status.vision) {
       try {
@@ -138,11 +138,11 @@ $("#bulk-file").addEventListener("change", async (e) => {
       failed++;
     }
   }
-  progress.textContent = failed ? `${failed} foto(s) falharam.` : "";
+  progress.textContent = failed ? `${failed} photo(s) failed.` : "";
   setTimeout(() => { if (!failed) progress.textContent = ""; }, 2000);
 });
 
-// ---------- Importar da pasta ----------
+// ---------- Import from folder ----------
 let scanResult = null;
 
 $("#import-btn").addEventListener("click", async () => {
@@ -163,7 +163,7 @@ $("#import-close").addEventListener("click", () => $("#import-dialog").close());
 
 $("#import-scan").addEventListener("click", async () => {
   const box = $("#import-preview");
-  box.innerHTML = '<p class="muted">A ler a pasta…</p>';
+  box.innerHTML = '<p class="muted">Reading the folder…</p>';
   $("#import-run").disabled = true;
   try {
     scanResult = await api("/api/import/scan", json("POST", { dir: $("#import-dir").value.trim() }));
@@ -177,16 +177,16 @@ $("#import-scan").addEventListener("click", async () => {
   const newPeople = scanResult.people.filter((p) => p.status === "new");
   const labelOf = (id) => status.categories.find((c) => c.id === id)?.singular || id;
   box.innerHTML = `
-    <div class="import-summary"><b>${fresh.length}</b> peças novas${known.length ? ` · ${known.length} já na app` : ""}${dups.length ? ` · ${dups.length} repetidas na pasta` : ""}${scanResult.skipped.length ? ` · ${scanResult.skipped.length} ignorados` : ""}</div>
-    ${fresh.length ? `<div class="itable-wrap"><table class="itable"><thead><tr><th>Ficheiro</th><th>Categoria</th><th>Nome</th><th>Tamanho</th><th>Marca</th><th>Modelo</th><th>Cor</th><th>Corte</th><th>Material</th></tr></thead><tbody>
-      ${fresh.map((f) => `<tr><td>${esc(f.rel)}</td><td>${esc(labelOf(f.category))}</td><td>${esc(f.name || "(automático)")}</td><td>${esc(f.size)}</td><td>${esc(f.brand)}</td><td>${esc(f.model)}</td><td>${esc(f.color)}</td><td>${esc(f.fit)}</td><td>${esc(f.material)}</td></tr>`).join("")}
+    <div class="import-summary"><b>${fresh.length}</b> new garments${known.length ? ` · ${known.length} already in the app` : ""}${dups.length ? ` · ${dups.length} repeated in the folder` : ""}${scanResult.skipped.length ? ` · ${scanResult.skipped.length} ignored` : ""}</div>
+    ${fresh.length ? `<div class="itable-wrap"><table class="itable"><thead><tr><th>File</th><th>Category</th><th>Name</th><th>Size</th><th>Brand</th><th>Model</th><th>Colour</th><th>Fit</th><th>Material</th></tr></thead><tbody>
+      ${fresh.map((f) => `<tr><td>${esc(f.rel)}</td><td>${esc(labelOf(f.category))}</td><td>${esc(f.name || "(automatic)")}</td><td>${esc(f.size)}</td><td>${esc(f.brand)}</td><td>${esc(f.model)}</td><td>${esc(f.color)}</td><td>${esc(f.fit)}</td><td>${esc(f.material)}</td></tr>`).join("")}
     </tbody></table></div>` : ""}
-    ${known.length ? `<p class="muted">Já na app (não serão importadas): ${known.map((f) => `${esc(f.rel)} (${esc(f.reason)})`).join("; ")}</p>` : ""}
-    ${dups.length ? `<p class="muted">Não importadas por terem o mesmo nome ou conteúdo que outra: ${dups.map((d) => `${esc(d.rel)} = ${esc(d.of)} (${esc(d.reason)})`).join("; ")}</p>` : ""}
-    ${scanResult.skipped.length ? `<p class="muted">Ignorados: ${scanResult.skipped.map((s) => `${esc(s.rel)} (${esc(s.reason)})`).join("; ")}</p>` : ""}
-    ${newPeople.length ? `<div class="import-summary"><b>Fotos soltas na pasta</b> <span class="muted">(se forem fotos tuas, importa-as para o Provador)</span>
+    ${known.length ? `<p class="muted">Already in the app (will not be imported): ${known.map((f) => `${esc(f.rel)} (${esc(f.reason)})`).join("; ")}</p>` : ""}
+    ${dups.length ? `<p class="muted">Not imported because they have the same name or content as another: ${dups.map((d) => `${esc(d.rel)} = ${esc(d.of)} (${esc(d.reason)})`).join("; ")}</p>` : ""}
+    ${scanResult.skipped.length ? `<p class="muted">Ignored: ${scanResult.skipped.map((s) => `${esc(s.rel)} (${esc(s.reason)})`).join("; ")}</p>` : ""}
+    ${newPeople.length ? `<div class="import-summary"><b>Loose photos in the folder</b> <span class="muted">(if they are photos of you, import them into the Fitting room)</span>
       ${newPeople.map((p) => `<label class="check"><input type="checkbox" data-person="${esc(p.rel)}"> ${esc(p.rel)}</label>`).join("")}</div>` : ""}
-    ${!scanResult.files.length && !scanResult.people.length ? '<p class="muted">Não encontrei imagens. Põe as fotos em subpastas com o nome da categoria.</p>' : ""}`;
+    ${!scanResult.files.length && !scanResult.people.length ? '<p class="muted">No images found. Put the photos in subfolders named after the category.</p>' : ""}`;
   $("#import-run").disabled = !fresh.length && !newPeople.length;
   updateImportEstimate();
 });
@@ -195,7 +195,7 @@ function updateImportEstimate() {
   const fresh = (scanResult?.files || []).filter((f) => f.status === "new");
   const mode = $("#import-analyze").value;
   const n = mode === "all" ? fresh.length : mode === "missing" ? fresh.filter((f) => !f.color).length : 0;
-  $("#import-estimate").textContent = n ? `${n} chamadas ao modelo de visão (fotos reduzidas). O consumo real aparece no fim.` : "Nenhuma chamada ao modelo.";
+  $("#import-estimate").textContent = n ? `${n} calls to the vision model (downscaled photos). Actual usage is shown at the end.` : "No calls to the model.";
 }
 $("#import-analyze").addEventListener("change", updateImportEstimate);
 
@@ -209,7 +209,7 @@ $("#import-run").addEventListener("click", async () => {
   const failed = [];
   let done = 0;
   for (const f of fresh) {
-    progress.textContent = `A importar ${done + 1}/${fresh.length}: ${f.rel}`;
+    progress.textContent = `Importing ${done + 1}/${fresh.length}: ${f.rel}`;
     try {
       const r = await api("/api/import/item", json("POST", { dir, rel: f.rel, analyze }));
       if (!r.skipped) { items.unshift(r); justAdded.add(r.id); }
@@ -224,14 +224,14 @@ $("#import-run").addEventListener("click", async () => {
   renderCloset();
   const after = await api("/api/settings/usage");
   const spent = after.prompt_tokens - before.prompt_tokens + after.completion_tokens - before.completion_tokens;
-  const spentTxt = analyze === "none" ? "" : ` Consumo desta importação: ${after.calls - before.calls} chamadas, ${spent.toLocaleString("pt-PT")} tokens.`;
+  const spentTxt = analyze === "none" ? "" : ` Usage for this import: ${after.calls - before.calls} calls, ${spent.toLocaleString("en-GB")} tokens.`;
   progress.innerHTML = failed.length
-    ? `<span class="error">${failed.length} falharam:</span> ${esc(failed.join(" · "))}`
-    : `Importadas ${fresh.length} peças${persons.length ? ` e ${persons.length} fotos tuas` : ""}. Toca numa peça para corrigir os detalhes.${spentTxt}`;
+    ? `<span class="error">${failed.length} failed:</span> ${esc(failed.join(" · "))}`
+    : `Imported ${fresh.length} garments${persons.length ? ` and ${persons.length} photos of you` : ""}. Tap a garment to correct its details.${spentTxt}`;
   $("#import-scan").click();
 });
 
-// ---------- Editar peça ----------
+// ---------- Edit garment ----------
 const form = $("#item-form");
 
 function openItem(it) {
@@ -239,7 +239,7 @@ function openItem(it) {
   form.reset();
   $("#item-error").textContent = "";
   $("#item-preview").src = it.image_url;
-  $("#item-source").textContent = it.source_path ? `Ficheiro de origem: ${it.source_path}` : "";
+  $("#item-source").textContent = it.source_path ? `Source file: ${it.source_path}` : "";
   $("#category-select").innerHTML = status.categories.map((c) => `<option value="${c.id}">${esc(c.singular)}</option>`).join("");
   for (const [k, v] of Object.entries(it)) if (form.elements[k]) form.elements[k].value = v;
   $("#item-dialog").showModal();
@@ -264,39 +264,39 @@ form.addEventListener("submit", async (e) => {
 });
 
 $("#item-delete").addEventListener("click", async () => {
-  if (!confirm("Apagar esta peça?")) return;
+  if (!confirm("Delete this garment?")) return;
   await api(`/api/items/${editing.id}`, { method: "DELETE" });
   $("#item-dialog").close();
   selectedItems.delete(editing.id);
   loadItems();
 });
 
-// ---------- Conselhos: 1) texto, 2) peças concretas, 3) imagem em ti ----------
+// ---------- Stylist: 1) text, 2) the actual garments, 3) image of you ----------
 $("#ask-btn").addEventListener("click", async () => {
   const prompt = $("#prompt").value.trim();
   if (!prompt) return;
   const out = $("#advice"), btn = $("#ask-btn");
   btn.disabled = true;
-  out.innerHTML = '<p class="muted">A olhar para o teu armário…</p>';
+  out.innerHTML = '<p class="muted">Looking through your wardrobe…</p>';
   try {
     const r = await api("/api/advise", json("POST", { prompt }));
     const u = r.usage || {}, cons = r.considered || {};
     const tokens = (u.prompt_tokens || 0) + (u.completion_tokens || 0);
-    const usageNote = `<p class="muted usage">${cons.total > cons.sent ? `Analisei ${cons.sent} das tuas ${cons.total} peças (as mais relevantes)` : `Analisei as tuas ${cons.total} peças`}${cons.photos ? `, ${cons.photos} com foto` : ""}. ${u.calls || 0} chamadas, ${tokens.toLocaleString("pt-PT")} tokens.${cons.note ? " " + esc(cons.note) : ""}</p>`;
+    const usageNote = `<p class="muted usage">${cons.total > cons.sent ? `I analysed ${cons.sent} of your ${cons.total} garments (the most relevant)` : `I analysed your ${cons.total} garments`}${cons.photos ? `, ${cons.photos} with photo` : ""}. ${u.calls || 0} calls, ${tokens.toLocaleString("en-GB")} tokens.${cons.note ? " " + esc(cons.note) : ""}</p>`;
     out.innerHTML = (r.general_tip ? `<p class="tip">${esc(r.general_tip)}</p>` : "") + learnedHtml(r.learned) + (r.outfits || []).map((o, n) => `
       <div class="outfit">
         <h3>${esc(o.title)}</h3>
         <p>${esc(o.why)}</p>
-        <p><b>Como vestir:</b> ${esc(o.how_to_wear)}</p>
-        ${o.fit_note ? `<p><b>O que te fica melhor:</b> ${esc(o.fit_note)}</p>` : ""}
-        ${o.missing ? `<p class="muted">Falta: ${esc(o.missing)}</p>` : ""}
-        <h4>Peças escolhidas</h4>
-        <div class="thumbs">${o.items.map((i) => `<div><img src="${i.image_url}" alt=""><span>${esc(i.name)}<br><small class="muted">${esc(i.image)}</small></span></div>`).join("") || '<span class="muted">Nenhuma peça do armário serve.</span>'}</div>
+        <p><b>How to wear it:</b> ${esc(o.how_to_wear)}</p>
+        ${o.fit_note ? `<p><b>What suits you best:</b> ${esc(o.fit_note)}</p>` : ""}
+        ${o.missing ? `<p class="muted">Missing: ${esc(o.missing)}</p>` : ""}
+        <h4>Chosen garments</h4>
+        <div class="thumbs">${o.items.map((i) => `<div><img src="${i.image_url}" alt=""><span>${esc(i.name)}<br><small class="muted">${esc(i.image)}</small></span></div>`).join("") || '<span class="muted">No garment in the wardrobe fits.</span>'}</div>
         <div class="tryon" id="tryon-${n}"></div>
         <div class="feedback" data-n="${n}">
-          <span class="muted">Que tal este outfit?</span>
-          <button data-rate="1">Gostei</button><button data-rate="-1">Não gostei</button>
-          <span class="fb-form hidden"><input placeholder="Porquê? (opcional)"><button class="primary" data-send>Enviar</button></span>
+          <span class="muted">What do you think of this outfit?</span>
+          <button data-rate="1">I like it</button><button data-rate="-1">I don't like it</button>
+          <span class="fb-form hidden"><input placeholder="Why? (optional)"><button class="primary" data-send>Send</button></span>
           <span class="fb-msg muted"></span>
         </div>
       </div>`).join("") + usageNote;
@@ -310,10 +310,10 @@ $("#ask-btn").addEventListener("click", async () => {
   }
 });
 
-// "Aprendi": factos novos que o estilista guardou; o × desfaz.
+// "Learned": new facts the stylist stored; the × undoes it.
 function learnedHtml(list) {
   if (!list?.length) return "";
-  return `<div class="learned"><b>Aprendi:</b> ${list.map((m) => `<span class="chip yes" data-mem="${m.id}">${esc(m.text)} <a href="#" data-undo="${m.id}" aria-label="Desfazer">×</a></span>`).join(" ")}</div>`;
+  return `<div class="learned"><b>Learned:</b> ${list.map((m) => `<span class="chip yes" data-mem="${m.id}">${esc(m.text)} <a href="#" data-undo="${m.id}" aria-label="Undo">×</a></span>`).join(" ")}</div>`;
 }
 function bindLearned(root) {
   root.querySelectorAll("[data-undo]").forEach((a) => a.addEventListener("click", async (e) => {
@@ -334,11 +334,11 @@ function bindFeedback(root, historyId) {
     }));
     box.querySelector("[data-send]").addEventListener("click", async (e) => {
       e.target.disabled = true;
-      msg.textContent = "A aprender…";
+      msg.textContent = "Learning…";
       try {
         const r = await api("/api/feedback", json("POST", { history_id: historyId, outfit_index: +box.dataset.n, rating, comment: form.querySelector("input").value }));
         form.classList.add("hidden");
-        msg.innerHTML = r.learned.length ? `Obrigado. Aprendi: ${r.learned.map((m) => esc(m.text)).join("; ")}` : "Obrigado, registado.";
+        msg.innerHTML = r.learned.length ? `Thanks. Learned: ${r.learned.map((m) => esc(m.text)).join("; ")}` : "Thanks, noted.";
       } catch (ex) {
         msg.textContent = ex.message;
       } finally {
@@ -348,28 +348,28 @@ function bindFeedback(root, historyId) {
   });
 }
 
-// Passo 3: as peças escolhidas seguem para o Gemini com a tua foto.
+// Step 3: the chosen garments go to the image model together with your photo.
 async function autoTryOn(outfits) {
   if (!$("#auto-tryon").checked || !outfits.length) return;
   const slot = (n) => $(`#tryon-${n}`);
   const note = (msg) => outfits.forEach((_, n) => (slot(n).innerHTML = `<p class="muted">${msg}</p>`));
-  if (!status.tryon) return note("Provador não configurado (falta GEMINI_API_KEY).");
+  if (!status.tryon) return note("The fitting room is not configured (the image-model key is missing).");
   const list = await api("/api/people");
-  if (!list.length) return note("Carrega uma foto tua no separador Provador para te ver com o outfit.");
+  if (!list.length) return note("Upload a photo of yourself in the Fitting room tab to see yourself in the outfit.");
   const person = (list.find((p) => p.id === selectedPerson) || list[0]).id;
-  outfits.forEach((o, n) => { if (o.item_ids.length) slot(n).innerHTML = '<h4>Em ti</h4><p class="muted">A vestir-te…</p>'; });
-  for (const [n, o] of outfits.entries()) {  // em sequência, para não esgotar quotas
+  outfits.forEach((o, n) => { if (o.item_ids.length) slot(n).innerHTML = '<h4>On you</h4><p class="muted">Dressing you…</p>'; });
+  for (const [n, o] of outfits.entries()) {  // one after another, so quotas are not exhausted
     if (!o.item_ids.length) continue;
     try {
       const r = await api("/api/tryon", json("POST", { person_id: person, item_ids: o.item_ids }));
-      slot(n).innerHTML = `<h4>Em ti</h4><img src="${r.image_url}" alt="Outfit em ti">`;
+      slot(n).innerHTML = `<h4>On you</h4><img src="${r.image_url}" alt="Outfit on you">`;
     } catch (ex) {
-      slot(n).innerHTML = `<h4>Em ti</h4><p class="error">${esc(ex.message)}</p>`;
+      slot(n).innerHTML = `<h4>On you</h4><p class="error">${esc(ex.message)}</p>`;
     }
   }
 }
 
-// ---------- Provador manual ----------
+// ---------- Fitting room (manual) ----------
 async function renderTryon() {
   people = await api("/api/people");
   if (!people.some((p) => p.id === selectedPerson)) selectedPerson = people[0]?.id ?? null;
@@ -400,13 +400,13 @@ $("#person-file").addEventListener("change", async (e) => {
 
 $("#tryon-btn").addEventListener("click", async () => {
   const out = $("#tryon-result"), btn = $("#tryon-btn");
-  if (!selectedPerson) return (out.innerHTML = '<p class="error">Carrega primeiro uma foto tua.</p>');
-  if (!selectedItems.size) return (out.innerHTML = `<p class="error">Escolhe pelo menos uma peça (máx. ${status.max_items}).</p>`);
+  if (!selectedPerson) return (out.innerHTML = '<p class="error">Upload a photo of yourself first.</p>');
+  if (!selectedItems.size) return (out.innerHTML = `<p class="error">Choose at least one garment (max. ${status.max_items}).</p>`);
   btn.disabled = true;
-  out.innerHTML = '<p class="muted">A vestir-te… pode demorar até 30 s.</p>';
+  out.innerHTML = '<p class="muted">Dressing you… this can take up to 30 s.</p>';
   try {
     const r = await api("/api/tryon", json("POST", { person_id: selectedPerson, item_ids: [...selectedItems] }));
-    out.innerHTML = `<img src="${r.image_url}" alt="Resultado">`;
+    out.innerHTML = `<img src="${r.image_url}" alt="Result">`;
   } catch (ex) {
     out.innerHTML = `<p class="error">${esc(ex.message)}</p>`;
   } finally {
@@ -414,21 +414,21 @@ $("#tryon-btn").addEventListener("click", async () => {
   }
 });
 
-// ---------- Desejos: links, lojas e ideias da IA ----------
+// ---------- Wishlist: links, stores and AI ideas ----------
 let stores = [], wishes = [];
 const catLabel = (id) => status.categories.find((c) => c.id === id)?.singular || "";
 
 async function loadWish() {
   [stores, wishes] = await Promise.all([api("/api/stores"), api("/api/wishlist")]);
-  $("#wish-category").innerHTML = '<option value="">Categoria (opcional)</option>' + status.categories.map((c) => `<option value="${c.id}">${esc(c.singular)}</option>`).join("");
+  $("#wish-category").innerHTML = '<option value="">Category (optional)</option>' + status.categories.map((c) => `<option value="${c.id}">${esc(c.singular)}</option>`).join("");
   renderStores();
   renderWishes();
 }
 
 function renderStores() {
   $("#stores").innerHTML = stores.length ? stores.map((s) => `
-    <span class="chip ${s.interested ? "yes" : "no"}" data-id="${s.id}" title="Tocar para alternar">${esc(s.name)}${s.count ? `<small>${s.count}</small>` : ""} <a href="#" data-del="${s.id}" aria-label="Remover">×</a></span>`).join("")
-    : '<span class="muted">Ainda sem lojas. Adiciona abaixo ou guarda um link.</span>';
+    <span class="chip ${s.interested ? "yes" : "no"}" data-id="${s.id}" title="Tap to switch">${esc(s.name)}${s.count ? `<small>${s.count}</small>` : ""} <a href="#" data-del="${s.id}" aria-label="Remove">×</a></span>`).join("")
+    : '<span class="muted">No stores yet. Add one below or save a link.</span>';
   $("#stores").querySelectorAll(".chip").forEach((c) => c.addEventListener("click", async (e) => {
     e.preventDefault();
     const id = +c.dataset.id;
@@ -442,7 +442,7 @@ function renderStores() {
     renderStores();
   }));
   const cur = $("#wish-filter").value;
-  $("#wish-filter").innerHTML = '<option value="">Todas as lojas</option>' + stores.map((s) => `<option ${s.name === cur ? "selected" : ""}>${esc(s.name)}</option>`).join("");
+  $("#wish-filter").innerHTML = '<option value="">All stores</option>' + stores.map((s) => `<option ${s.name === cur ? "selected" : ""}>${esc(s.name)}</option>`).join("");
 }
 
 function renderWishes() {
@@ -456,12 +456,12 @@ function renderWishes() {
         <div class="tags">${esc([w.store, catLabel(w.category), w.price].filter(Boolean).join(" · "))}</div>
         ${w.notes ? `<div>${esc(w.notes)}</div>` : ""}
         <div class="acts">
-          ${w.url ? `<a href="${esc(w.url)}" target="_blank" rel="noopener noreferrer">${w.source === "ai" ? "Pesquisar" : "Abrir"}</a>` : ""}
-          <button data-bought>${w.bought ? "Por comprar" : "Comprado"}</button>
-          <button data-del>Apagar</button>
+          ${w.url ? `<a href="${esc(w.url)}" target="_blank" rel="noopener noreferrer">${w.source === "ai" ? "Search" : "Open"}</a>` : ""}
+          <button data-bought>${w.bought ? "Not bought" : "Bought"}</button>
+          <button data-del>Delete</button>
         </div>
       </div>
-    </div>`).join("") : '<p class="muted">Nada guardado ainda.</p>';
+    </div>`).join("") : '<p class="muted">Nothing saved yet.</p>';
   $("#wishlist").querySelectorAll(".wish").forEach((el) => {
     const id = +el.dataset.id;
     el.querySelector("[data-bought]").addEventListener("click", async () => {
@@ -470,7 +470,7 @@ function renderWishes() {
       renderWishes();
     });
     el.querySelector("[data-del]").addEventListener("click", async () => {
-      if (!confirm("Apagar este item?")) return;
+      if (!confirm("Delete this item?")) return;
       await api(`/api/wishlist/${id}`, { method: "DELETE" });
       await loadWish();
     });
@@ -484,11 +484,11 @@ $("#wish-form").addEventListener("submit", async (e) => {
   const data = Object.fromEntries(new FormData(f));
   btn.disabled = true;
   msg.className = "muted";
-  msg.textContent = data.url ? "A ler o link…" : "A guardar…";
+  msg.textContent = data.url ? "Reading the link…" : "Saving…";
   try {
     const w = await api("/api/wishlist", json("POST", { ...data, source: data.url ? "link" : "manual" }));
     f.reset();
-    msg.textContent = w.scraped ? "Guardado." : "Guardado, mas o site não deixou ler os detalhes. Podes escrever o título e o preço à mão.";
+    msg.textContent = w.scraped ? "Saved." : "Saved, but the site would not let me read the details. You can type the title and price by hand.";
     await loadWish();
   } catch (ex) {
     msg.className = "error";
@@ -511,7 +511,7 @@ $("#store-form").addEventListener("submit", async (e) => {
 $("#suggest-btn").addEventListener("click", async () => {
   const out = $("#suggestions"), btn = $("#suggest-btn");
   btn.disabled = true;
-  out.innerHTML = '<p class="muted">A analisar o teu armário…</p>';
+  out.innerHTML = '<p class="muted">Analysing your wardrobe…</p>';
   try {
     const r = await api("/api/wishlist/suggest", json("POST", { prompt: $("#suggest-prompt").value.trim() }));
     const list = r.suggestions || [];
@@ -522,16 +522,16 @@ $("#suggest-btn").addEventListener("click", async () => {
         <p>${esc(s.why)}</p>
         ${s.combines_with.length ? `<div class="thumbs">${s.combines_with.map((i) => `<div><img src="${i.image_url}" alt=""><span>${esc(i.name)}</span></div>`).join("")}</div>` : ""}
         <div class="bar">
-          <a class="button" href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Pesquisar</a>
-          <button data-save="${n}">Guardar</button>
+          <a class="button" href="${esc(s.search_url)}" target="_blank" rel="noopener noreferrer">Search</a>
+          <button data-save="${n}">Save</button>
         </div>
-      </div>`).join("") || '<p class="muted">Sem sugestões desta vez.</p>';
+      </div>`).join("") || '<p class="muted">No suggestions this time.</p>';
     out.querySelectorAll("[data-save]").forEach((b) => b.addEventListener("click", async () => {
       const s = list[b.dataset.save];
       b.disabled = true;
       try {
         await api("/api/wishlist", json("POST", { url: s.search_url, title: s.title, store: s.store, category: s.category, notes: s.why, source: "ai" }));
-        b.textContent = "Guardado";
+        b.textContent = "Saved";
         wishes = await api("/api/wishlist");
         stores = await api("/api/stores");
         renderWishes();
@@ -548,7 +548,7 @@ $("#suggest-btn").addEventListener("click", async () => {
   }
 });
 
-// ---------- Memória ----------
+// ---------- Memory ----------
 async function loadMemory() {
   const [profile, mems, hist, body] = await Promise.all([api("/api/profile"), api("/api/memories"), api("/api/history"), api("/api/body")]);
   $("#profile-text").value = profile.text;
@@ -558,9 +558,9 @@ async function loadMemory() {
     <div class="mem" data-id="${m.id}" data-kind="${esc(m.kind)}">
       <span class="badge">${esc(m.kind)}</span>
       <span class="mem-text">${esc(m.text)}</span>
-      <small class="muted">${m.source === "user" ? "tu" : m.source === "feedback" ? "feedback" : "aprendido"}</small>
-      <button data-edit>Editar</button><button data-del>×</button>
-    </div>`).join("") : '<p class="muted">Ainda sem memória. Diz ao estilista o que gostas ou evitas, ou dá feedback aos outfits.</p>';
+      <small class="muted">${m.source === "user" ? "you" : m.source === "feedback" ? "feedback" : "learned"}</small>
+      <button data-edit>Edit</button><button data-del>×</button>
+    </div>`).join("") : '<p class="muted">No memory yet. Tell the stylist what you like or avoid, or give feedback on outfits.</p>';
   $("#memories").querySelectorAll(".mem").forEach((el) => {
     const id = +el.dataset.id;
     el.querySelector("[data-del]").addEventListener("click", async () => {
@@ -568,7 +568,7 @@ async function loadMemory() {
       loadMemory();
     });
     el.querySelector("[data-edit]").addEventListener("click", async () => {
-      const text = prompt("Editar:", el.querySelector(".mem-text").textContent);
+      const text = prompt("Edit:", el.querySelector(".mem-text").textContent);
       if (text === null) return;
       try {
         await api(`/api/memories/${id}`, json("PUT", { text, kind: el.dataset.kind }));
@@ -580,7 +580,7 @@ async function loadMemory() {
     <div class="hist">
       <small class="muted">${esc(h.created_at.slice(0, 10))}</small> <b>${esc(h.prompt)}</b>
       ${h.outfits.map((o) => `<div class="muted">${o.rating > 0 ? "👍" : o.rating < 0 ? "👎" : "•"} ${esc(o.title)}: ${esc(o.item_names.join(", "))}</div>`).join("")}
-    </div>`).join("") : '<p class="muted">Ainda sem pedidos.</p>';
+    </div>`).join("") : '<p class="muted">No requests yet.</p>';
 }
 
 $("#body-form").addEventListener("submit", async (e) => {
@@ -589,7 +589,7 @@ $("#body-form").addEventListener("submit", async (e) => {
   try {
     await api("/api/body", json("PUT", Object.fromEntries(new FormData(e.target))));
     msg.className = "muted";
-    msg.textContent = "Guardado.";
+    msg.textContent = "Saved.";
     setTimeout(() => (msg.textContent = ""), 2000);
   } catch (ex) {
     msg.className = "error";
@@ -599,7 +599,7 @@ $("#body-form").addEventListener("submit", async (e) => {
 
 $("#profile-save").addEventListener("click", async () => {
   await api("/api/profile", json("PUT", { text: $("#profile-text").value }));
-  $("#profile-msg").textContent = "Guardado.";
+  $("#profile-msg").textContent = "Saved.";
   setTimeout(() => ($("#profile-msg").textContent = ""), 2000);
 });
 
@@ -616,19 +616,19 @@ $("#memory-form").addEventListener("submit", async (e) => {
   }
 });
 
-// ---------- Definições dos modelos ----------
+// ---------- Model settings ----------
 const SETTING_FIELDS = ["LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL", "LLM_VISION_MODEL", "GEMINI_API_KEY", "TRYON_MODEL", "TRYON_BASE_URL"];
 
 async function refreshStatus() {
   status = { ...status, ...(await api("/api/status")) };
   const dot = $("#model-dot");
   dot.className = "dot " + (status.advice ? "ok" : "bad");
-  dot.title = `Texto: ${status.advice ? "ok" : "falta configurar"} · Visão: ${status.vision ? "ok" : "desligada"} · Provador: ${status.tryon ? "ok" : "desligado"}`;
+  dot.title = `Text: ${status.advice ? "ok" : "not configured"} · Vision: ${status.vision ? "ok" : "off"} · Fitting room: ${status.tryon ? "ok" : "off"}`;
 }
 
 async function loadSettings() {
   api("/api/settings/usage").then((u) => {
-    $("#usage-line").textContent = `Desde que o servidor arrancou: ${u.calls} chamadas · ${u.prompt_tokens.toLocaleString("pt-PT")} tokens enviados · ${u.completion_tokens.toLocaleString("pt-PT")} recebidos.`;
+    $("#usage-line").textContent = `Since the server started: ${u.calls} calls · ${u.prompt_tokens.toLocaleString("en-GB")} tokens sent · ${u.completion_tokens.toLocaleString("en-GB")} received.`;
   }).catch(() => {});
   const s = await api("/api/settings");
   const f = $("#settings-form");
@@ -636,7 +636,7 @@ async function loadSettings() {
     const el = f.elements[name];
     if (name.endsWith("_KEY")) {
       el.value = "";
-      el.placeholder = s[`${name}_set`] ? `guardada (${s[name + "_hint"]}) — deixa vazio para manter` : el.placeholder;
+      el.placeholder = s[`${name}_set`] ? `saved (${s[name + "_hint"]}) — leave empty to keep it` : el.placeholder;
     } else {
       el.value = s[name];
     }
@@ -657,7 +657,7 @@ $("#settings-form").addEventListener("submit", async (e) => {
   try {
     await saveSettings();
     msg.className = "muted";
-    msg.textContent = "Guardado.";
+    msg.textContent = "Saved.";
   } catch (ex) {
     msg.className = "error";
     msg.textContent = ex.message;
@@ -666,12 +666,12 @@ $("#settings-form").addEventListener("submit", async (e) => {
 
 $("#load-models").addEventListener("click", async () => {
   const msg = $("#models-msg");
-  msg.textContent = "A carregar…";
+  msg.textContent = "Loading…";
   try {
     await saveSettings();
     const r = await api("/api/settings/models");
     $("#model-list").innerHTML = r.models.map((m) => `<option value="${esc(m)}">`).join("");
-    msg.textContent = r.ok ? `${r.models.length} modelos. Clica num campo de modelo e escolhe.` : r.error;
+    msg.textContent = r.ok ? `${r.models.length} models. Click a model field and choose one.` : r.error;
   } catch (ex) {
     msg.textContent = ex.message;
   }
@@ -681,18 +681,18 @@ document.querySelectorAll("[data-test]").forEach((btn) => btn.addEventListener("
   const kind = btn.dataset.test, box = $(`#result-${kind}`);
   btn.disabled = true;
   box.className = "result";
-  box.textContent = "A testar…";
+  box.textContent = "Testing…";
   try {
     await saveSettings();
     const r = await api(`/api/settings/test/${kind}`, { method: "POST" });
     const warn = r.ok && (r.json_ok === false || r.sees_image === false);
     box.className = "result " + (r.ok && !warn ? "ok" : "bad");
     box.innerHTML = r.ok
-      ? `<b>${warn ? "⚠ Respondeu, mas…" : "✓ Funciona"}</b> · ${esc(r.model)} · ${r.ms} ms`
+      ? `<b>${warn ? "⚠ It answered, but…" : "✓ Works"}</b> · ${esc(r.model)} · ${r.ms} ms`
         + (r.note ? `<div>${esc(r.note)}</div>` : "")
         + (r.reply ? `<code>${esc(r.reply)}</code>` : "")
-        + (r.image_url ? `<img src="${r.image_url}" alt="Resultado do teste">` : "")
-      : `<b>✗ Falhou</b> · ${r.ms} ms<div>${esc(r.error)}</div>`;
+        + (r.image_url ? `<img src="${r.image_url}" alt="Test result">` : "")
+      : `<b>✗ Failed</b> · ${r.ms} ms<div>${esc(r.error)}</div>`;
   } catch (ex) {
     box.className = "result bad";
     box.textContent = ex.message;
@@ -701,11 +701,11 @@ document.querySelectorAll("[data-test]").forEach((btn) => btn.addEventListener("
   }
 }));
 
-// ---------- Arranque ----------
+// ---------- Start-up ----------
 (async () => {
   status = await api("/api/status");
   await refreshStatus();
-  if (!status.advice) showTab("settings");  // primeira vez: começa pela configuração dos modelos
+  if (!status.advice) showTab("settings");  // first run: start with the model settings
   await loadItems();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js");
 })();

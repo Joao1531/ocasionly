@@ -1,4 +1,4 @@
-"""Importação em massa a partir de uma pasta do Mac, com uma subpasta por categoria."""
+"""Bulk import from a folder on this computer, with one subfolder per category."""
 import hashlib
 from pathlib import Path
 
@@ -16,25 +16,25 @@ SINGULAR = {cid: singular for cid, _, singular in db.CATEGORIES}
 
 
 def _local_only(request: Request) -> None:
-    """Esta rota lê ficheiros do disco, por isso só aceita pedidos feitos a partir do próprio Mac."""
+    """These routes read files from disk, so they only accept requests made from this computer itself."""
     if (request.client.host if request.client else "") not in LOCAL_HOSTS:
-        raise HTTPException(403, "A importação de pastas só funciona abrindo a app no próprio Mac (localhost), não pelo telemóvel.")
+        raise HTTPException(403, "Folder import only works when the app is opened on this computer (localhost), not from a phone.")
 
 
 def _root(dir_: str) -> Path:
     root = Path(dir_ or config.get("IMPORT_DIR")).expanduser().resolve()
     home = Path.home().resolve()
     if home not in (root, *root.parents):
-        raise HTTPException(400, f"Escolhe uma pasta dentro da tua pasta pessoal ({home}).")
+        raise HTTPException(400, f"Choose a folder inside your home folder ({home}).")
     if not root.is_dir():
-        raise HTTPException(404, f"A pasta «{root}» não existe.")
+        raise HTTPException(404, f"The folder «{root}» does not exist.")
     return root
 
 
 def _file(root: Path, rel: str) -> Path:
     path = (root / rel).resolve()
     if root not in path.parents or not path.is_file() or path.suffix.lower() not in IMAGE_EXTS:
-        raise HTTPException(400, "Ficheiro inválido.")
+        raise HTTPException(400, "Invalid file.")
     return path
 
 
@@ -49,12 +49,12 @@ def _known_hashes(c) -> tuple[set[str], set[str]]:
 
 
 def name_key(path_or_name: str) -> str:
-    """Chave do «mesmo nome»: sem pasta, sem extensão, sem maiúsculas nem acentos (NFC/NFD do macOS incluídos)."""
+    """Key for "same name": no folder, no extension, ignoring case and accents (macOS NFC/NFD included)."""
     return filenames.norm(Path(path_or_name).stem)
 
 
 def _known_names(c) -> tuple[dict[str, str], dict[str, str]]:
-    """Nome (chave) -> caminho do ficheiro que já foi importado com esse nome."""
+    """Name (key) -> path of the file that was already imported with that name."""
     items = {name_key(r["source_path"]): r["source_path"] for r in c.execute("SELECT source_path FROM items WHERE source_path != ''")}
     people = {name_key(r["source_path"]): r["source_path"] for r in c.execute("SELECT source_path FROM people WHERE source_path != ''")}
     return items, people
@@ -84,33 +84,33 @@ def scan(body: ScanIn, request: Request):
         item_hashes, person_hashes = _known_hashes(c)
         item_names, person_names = _known_names(c)
     files, people, skipped, duplicates = [], [], [], []
-    seen_names: dict[tuple[str, str], str] = {}  # (grupo, nome) -> primeiro ficheiro com esse nome nesta pasta
+    seen_names: dict[tuple[str, str], str] = {}  # (group, name) -> first file with that name in this folder
     seen_hashes: dict[tuple[str, str], str] = {}
     for path in sorted(root.rglob("*")):
         if not path.is_file() or path.name.startswith("."):
             continue
         rel = str(path.relative_to(root))
         if path.suffix.lower() not in IMAGE_EXTS:
-            skipped.append({"rel": rel, "reason": "não é uma imagem"})
+            skipped.append({"rel": rel, "reason": "not an image"})
             continue
         digest, key = _sha1(path), name_key(path.name)
-        is_person = len(path.relative_to(root).parts) == 1  # imagem solta na raiz: provavelmente uma foto tua
+        is_person = len(path.relative_to(root).parts) == 1  # loose image in the root: probably a photo of you
         category = None if is_person else _category_of(root, path)
         if not is_person and category is None:
-            skipped.append({"rel": rel, "reason": f"pasta «{path.relative_to(root).parts[0]}» desconhecida"})
+            skipped.append({"rel": rel, "reason": f"unknown folder «{path.relative_to(root).parts[0]}»"})
             continue
         group = "people" if is_person else "items"
         known_hashes, known_names = (person_hashes, person_names) if is_person else (item_hashes, item_names)
         if key in known_names:
             same_file = known_names[key] == rel
-            status, reason = "imported", "já importada" if same_file else f"já existe uma foto com o mesmo nome ({known_names[key]})"
+            status, reason = "imported", "already imported" if same_file else f"a photo with the same name already exists ({known_names[key]})"
         elif digest in known_hashes:
-            status, reason = "imported", "já importada (conteúdo igual)"
+            status, reason = "imported", "already imported (identical content)"
         elif (group, key) in seen_names:
-            duplicates.append({"rel": rel, "of": seen_names[(group, key)], "reason": "mesmo nome"})
+            duplicates.append({"rel": rel, "of": seen_names[(group, key)], "reason": "same name"})
             continue
         elif (group, digest) in seen_hashes:
-            duplicates.append({"rel": rel, "of": seen_hashes[(group, digest)], "reason": "conteúdo igual"})
+            duplicates.append({"rel": rel, "of": seen_hashes[(group, digest)], "reason": "identical content"})
             continue
         else:
             status, reason = "new", ""
@@ -127,7 +127,7 @@ def scan(body: ScanIn, request: Request):
 class ItemIn(BaseModel):
     dir: str = ""
     rel: str
-    analyze: bool | str = "none"  # none | missing (só peças sem cor no nome) | all
+    analyze: bool | str = "none"  # none | missing (only garments without a colour in the name) | all
 
 
 @router.post("/item")
@@ -137,20 +137,20 @@ def import_item(body: ItemIn, request: Request):
     path = _file(root, body.rel)
     category = _category_of(root, path)
     if category is None:
-        raise HTTPException(400, "Esta pasta não corresponde a nenhuma categoria.")
+        raise HTTPException(400, "This folder does not match any category.")
     digest = _sha1(path)
     with db.conn() as c:
         if name_key(path.name) in _known_names(c)[0]:
-            return {"skipped": True, "reason": "mesmo nome"}
+            return {"skipped": True, "reason": "same name"}
         if digest in _known_hashes(c)[0]:
-            return {"skipped": True, "reason": "conteúdo igual"}
+            return {"skipped": True, "reason": "identical content"}
         count = c.execute("SELECT COUNT(*) AS n FROM items WHERE category=?", (category,)).fetchone()["n"]
     f = filenames.parse(path.name, category, SINGULAR[category])
     f["name"] = f["name"] or f"{SINGULAR[category]} {count + 1}"
     try:
         fname = images.save_upload(path.read_bytes(), "item")
     except Exception:
-        raise HTTPException(400, f"Não consegui abrir a imagem «{body.rel}».")
+        raise HTTPException(400, f"Could not open the image «{body.rel}».")
     mode = "all" if body.analyze is True else ("none" if body.analyze in (False, "none", "") else str(body.analyze))
     if config.status()["vision"] and (mode == "all" or (mode == "missing" and not f["color"])):
         try:
@@ -158,7 +158,7 @@ def import_item(body: ItemIn, request: Request):
             for k in ("color", "season", "formality"):
                 f[k] = f.get(k) or guess.get(k, "")
         except AIError:
-            pass  # a análise é opcional: a peça entra na mesma
+            pass  # the analysis is optional: the garment is imported anyway
     f.setdefault("season", "")
     f.setdefault("formality", "")
     with db.conn() as c:
@@ -180,13 +180,13 @@ def import_person(body: ItemIn, request: Request):
     digest = _sha1(path)
     with db.conn() as c:
         if name_key(path.name) in _known_names(c)[1]:
-            return {"skipped": True, "reason": "mesmo nome"}
+            return {"skipped": True, "reason": "same name"}
         if digest in _known_hashes(c)[1]:
-            return {"skipped": True, "reason": "conteúdo igual"}
+            return {"skipped": True, "reason": "identical content"}
     try:
         fname = images.save_upload(path.read_bytes(), "person")
     except Exception:
-        raise HTTPException(400, f"Não consegui abrir a imagem «{body.rel}».")
+        raise HTTPException(400, f"Could not open the image «{body.rel}».")
     with db.conn() as c:
         cur = c.execute("INSERT INTO people (image, file_hash, source_path) VALUES (?, ?, ?)", (fname, digest, body.rel))
         row = dict(c.execute("SELECT * FROM people WHERE id=?", (cur.lastrowid,)).fetchone())
